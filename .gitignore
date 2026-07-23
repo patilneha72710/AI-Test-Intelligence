@@ -1,0 +1,14 @@
+﻿# Python
+backend/venv/
+__pycache__/
+*.pyc
+
+# Environment secrets
+.env
+
+# Database
+database/*.db
+
+# OS files
+.DS_Store
+Thumbs.db
