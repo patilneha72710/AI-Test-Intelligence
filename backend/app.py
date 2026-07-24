@@ -293,5 +293,68 @@ Requirement text:
     })
 
 
+@app.route("/api/generate-playwright", methods=["POST"])
+def generate_playwright():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(filepath)
+
+    try:
+        raw_text = extract_text(file, filepath)
+        if raw_text is None:
+            return jsonify({"error": "Unsupported file type. Use PDF, DOCX, or TXT."}), 400
+    except Exception as e:
+        return jsonify({"error": f"Failed to read file: {str(e)}"}), 500
+
+    if not raw_text.strip():
+        return jsonify({"error": "No readable text found in the file."}), 400
+
+    prompt = f"""
+You are a senior QA automation engineer. Read the following software requirement text
+and generate a complete Python Playwright test automation script.
+
+Rules:
+- Use Python with the playwright.sync_api package (sync_playwright, Page, expect).
+- Structure it using Pytest-style test functions (def test_xxx(page): ...).
+- Use placeholder CSS selectors like page.locator("#email") and page.locator("#password") — reasonable guesses based on the requirement text.
+- Navigate to a placeholder URL like "https://example.com/login" at the start of each test.
+- Write one test function per requirement, with clear function names like test_successful_login.
+- Use Playwright's expect() assertions to check expected outcomes (e.g. URL, visible text, element state) after each action.
+- Add short comments explaining each major step.
+- Return ONLY the Python code, no markdown code fences, no commentary outside the code.
+
+Requirement text:
+{raw_text[:8000]}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        script_text = response.choices[0].message.content.strip()
+
+        # Clean up in case the model wraps it in markdown fences anyway
+        if script_text.startswith("```"):
+            script_text = script_text.split("```")[1]
+            if script_text.startswith("python"):
+                script_text = script_text[6:]
+            script_text = script_text.strip()
+
+    except Exception as e:
+        return jsonify({"error": f"Groq API error: {str(e)}"}), 500
+
+    return jsonify({
+        "filename": file.filename,
+        "playwright_script": script_text
+    })
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
