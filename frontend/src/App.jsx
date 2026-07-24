@@ -1,30 +1,181 @@
 import { useEffect, useState } from "react";
 
+const modules = [
+  { id: "requirements", name: "Requirement Analyzer", desc: "Extract structured requirements from PDF/DOCX/TXT", active: true },
+  { id: "testcases", name: "Test Case Generator", desc: "Functional, boundary & negative test cases", active: false },
+  { id: "api", name: "API Test Generator", desc: "Generate Postman collections from requirements", active: false },
+  { id: "selenium", name: "Selenium Script Generator", desc: "Auto-generate Selenium automation scripts", active: false },
+  { id: "playwright", name: "Playwright Script Generator", desc: "Auto-generate Playwright automation scripts", active: false },
+  { id: "testdata", name: "Test Data Generator", desc: "Realistic & edge-case test data", active: false },
+  { id: "locators", name: "Self-Healing Locators", desc: "Detect and repair broken UI locators", active: false },
+  { id: "report", name: "AI Report Generator", desc: "Summarized, AI-written test reports", active: false },
+];
+
 function App() {
-  const [status, setStatus] = useState("Checking backend connection...");
+  const [status, setStatus] = useState("connecting");
+  const [log, setLog] = useState([]);
+  const [activeModule, setActiveModule] = useState("requirements");
+
+  const [file, setFile] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/health")
-      .then((res) => res.json())
-      .then((data) => {
-        setStatus(`Backend connected! Status: ${data.status}`);
-      })
-      .catch(() => {
-        setStatus("Could not connect to backend.");
-      });
+    const check = () => {
+      fetch("http://127.0.0.1:5000/health")
+        .then((res) => res.json())
+        .then((data) => {
+          setStatus("ok");
+          setLog((prev) => [...prev.slice(-3), `[${new Date().toLocaleTimeString()}] GET /health → 200 ${data.status}`]);
+        })
+        .catch(() => {
+          setStatus("down");
+          setLog((prev) => [...prev.slice(-3), `[${new Date().toLocaleTimeString()}] GET /health → failed`]);
+        });
+    };
+    check();
+    const interval = setInterval(check, 8000);
+    return () => clearInterval(interval);
   }, []);
 
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+    setResult(null);
+    setError(null);
+  };
+
+  const handleAnalyze = async () => {
+    if (!file) return;
+    setAnalyzing(true);
+    setError(null);
+    setResult(null);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/analyze-requirements", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Something went wrong.");
+      } else {
+        setResult(data);
+      }
+    } catch (err) {
+      setError("Could not reach the backend.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="bg-white shadow-lg rounded-2xl p-10 text-center max-w-md w-full">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">
-          AI Test Intelligence Platform
+    <div className="min-h-screen bg-[#0B0D12] text-[#E8EAF0] flex">
+      {/* Sidebar */}
+      <aside className="w-64 border-r border-[#232838] px-6 py-8 hidden md:block">
+        <h1 className="font-display font-bold text-lg tracking-tight">
+          Test<span className="text-[#4CC9F0]">Intel</span>
         </h1>
-        <p className="text-gray-500 mb-4">
-          AI-powered test automation dashboard
-        </p>
-        <p className="text-green-600 font-medium">{status}</p>
-      </div>
+        <p className="text-xs text-[#7C8699] mt-1 mb-8">AI Test Intelligence Platform</p>
+
+        <nav className="space-y-1">
+          {modules.map((m) => (
+            <div
+              key={m.id}
+              onClick={() => m.active && setActiveModule(m.id)}
+              className={`px-3 py-2 rounded-lg text-sm transition ${
+                m.active
+                  ? activeModule === m.id
+                    ? "bg-[#141821] text-[#E8EAF0] border border-[#4CC9F0]/40 cursor-pointer"
+                    : "text-[#E8EAF0] hover:bg-[#141821] cursor-pointer border border-transparent"
+                  : "text-[#7C8699] cursor-not-allowed"
+              }`}
+            >
+              {m.name}
+              {!m.active && (
+                <span className="text-[10px] uppercase tracking-wide text-[#4CC9F0]/60 ml-2">soon</span>
+              )}
+            </div>
+          ))}
+        </nav>
+      </aside>
+
+      {/* Main */}
+      <main className="flex-1 px-6 md:px-12 py-8">
+        <div className="max-w-3xl">
+          <p className="font-mono text-xs text-[#7C8699] mb-2">SYSTEM STATUS</p>
+
+          <div className="bg-[#141821] border border-[#232838] rounded-xl p-4 mb-10">
+            <div className="flex items-center gap-2 mb-3">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  status === "ok" ? "bg-[#34D399]" : status === "down" ? "bg-red-500" : "bg-[#4CC9F0] animate-pulse"
+                }`}
+              />
+              <span className="font-mono text-xs text-[#7C8699]">
+                backend {status === "ok" ? "connected" : status === "down" ? "unreachable" : "checking..."}
+              </span>
+            </div>
+            <div className="font-mono text-xs space-y-1">
+              {log.length === 0 && <p className="text-[#7C8699]">awaiting first check...</p>}
+              {log.map((line, i) => (
+                <p key={i} className={line.includes("200") ? "text-[#34D399]" : "text-red-400"}>
+                  {line}
+                </p>
+              ))}
+            </div>
+          </div>
+
+          {activeModule === "requirements" && (
+            <>
+              <h2 className="font-display text-2xl font-bold mb-1">Requirement Analyzer</h2>
+              <p className="text-[#7C8699] text-sm mb-6">
+                Upload a PDF, DOCX, or TXT requirement document to extract structured requirements.
+              </p>
+
+              <div className="border border-dashed border-[#232838] rounded-xl p-8 text-center bg-[#101319] mb-6">
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.txt"
+                  onChange={handleFileChange}
+                  className="block mx-auto text-sm text-[#7C8699] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#4CC9F0]/10 file:text-[#4CC9F0] file:text-sm hover:file:bg-[#4CC9F0]/20 cursor-pointer"
+                />
+                {file && (
+                  <p className="font-mono text-xs text-[#7C8699] mt-3">{file.name}</p>
+                )}
+              </div>
+
+              <button
+                onClick={handleAnalyze}
+                disabled={!file || analyzing}
+                className="bg-[#4CC9F0] text-[#0B0D12] font-medium text-sm px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#4CC9F0]/90 transition"
+              >
+                {analyzing ? "Analyzing..." : "Analyze Requirements"}
+              </button>
+
+              {error && (
+                <div className="mt-6 border border-red-500/30 bg-red-500/10 text-red-400 text-sm rounded-xl p-4">
+                  {error}
+                </div>
+              )}
+
+              {result && (
+                <div className="mt-6 border border-[#232838] bg-[#141821] rounded-xl p-6">
+                  <p className="font-mono text-xs text-[#7C8699] mb-3">
+                    EXTRACTED FROM {result.filename.toUpperCase()}
+                  </p>
+                  <pre className="whitespace-pre-wrap font-mono text-sm text-[#E8EAF0] leading-relaxed">
+                    {result.requirements}
+                  </pre>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
