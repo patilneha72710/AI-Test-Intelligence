@@ -48,6 +48,18 @@ def extract_text_from_txt(filepath):
         return f.read()
 
 
+def extract_text(file, filepath):
+    ext = file.filename.rsplit(".", 1)[-1].lower()
+    if ext == "pdf":
+        return extract_text_from_pdf(filepath)
+    elif ext == "docx":
+        return extract_text_from_docx(filepath)
+    elif ext == "txt":
+        return extract_text_from_txt(filepath)
+    else:
+        return None
+
+
 @app.route("/api/analyze-requirements", methods=["POST"])
 def analyze_requirements():
     if "file" not in request.files:
@@ -60,16 +72,9 @@ def analyze_requirements():
     filepath = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(filepath)
 
-    # Extract text based on file type
-    ext = file.filename.rsplit(".", 1)[-1].lower()
     try:
-        if ext == "pdf":
-            raw_text = extract_text_from_pdf(filepath)
-        elif ext == "docx":
-            raw_text = extract_text_from_docx(filepath)
-        elif ext == "txt":
-            raw_text = extract_text_from_txt(filepath)
-        else:
+        raw_text = extract_text(file, filepath)
+        if raw_text is None:
             return jsonify({"error": "Unsupported file type. Use PDF, DOCX, or TXT."}), 400
     except Exception as e:
         return jsonify({"error": f"Failed to read file: {str(e)}"}), 500
@@ -77,7 +82,6 @@ def analyze_requirements():
     if not raw_text.strip():
         return jsonify({"error": "No readable text found in the file."}), 400
 
-    # Send to Gemini for structured requirement extraction
     prompt = f"""
 You are a senior QA analyst. Read the following software requirement document text
 and extract clear, structured software requirements from it.
@@ -98,10 +102,70 @@ Document text:
         requirements_text = response.choices[0].message.content
     except Exception as e:
         return jsonify({"error": f"Groq API error: {str(e)}"}), 500
-    
+
     return jsonify({
         "filename": file.filename,
         "requirements": requirements_text
+    })
+
+
+@app.route("/api/generate-testcases", methods=["POST"])
+def generate_testcases():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(filepath)
+
+    try:
+        raw_text = extract_text(file, filepath)
+        if raw_text is None:
+            return jsonify({"error": "Unsupported file type. Use PDF, DOCX, or TXT."}), 400
+    except Exception as e:
+        return jsonify({"error": f"Failed to read file: {str(e)}"}), 500
+
+    if not raw_text.strip():
+        return jsonify({"error": "No readable text found in the file."}), 400
+
+    prompt = f"""
+You are a senior QA engineer. Read the following software requirement text and generate
+a complete set of test cases covering these four categories:
+
+1. Functional Test Cases
+2. Positive Test Cases
+3. Negative Test Cases
+4. Boundary Test Cases
+
+For each test case, include:
+- Test Case ID (e.g. TC_001)
+- Title
+- Category (Functional / Positive / Negative / Boundary)
+- Steps
+- Expected Result
+
+Format the output clearly with headers for each category. Do not include commentary,
+only the structured test cases.
+
+Requirement text:
+{raw_text[:8000]}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        testcases_text = response.choices[0].message.content
+    except Exception as e:
+        return jsonify({"error": f"Groq API error: {str(e)}"}), 500
+
+    return jsonify({
+        "filename": file.filename,
+        "testcases": testcases_text
     })
 
 

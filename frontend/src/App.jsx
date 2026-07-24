@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 const modules = [
   { id: "requirements", name: "Requirement Analyzer", desc: "Extract structured requirements from PDF/DOCX/TXT", active: true },
-  { id: "testcases", name: "Test Case Generator", desc: "Functional, boundary & negative test cases", active: false },
+  { id: "testcases", name: "Test Case Generator", desc: "Functional, boundary & negative test cases", active: true },
   { id: "api", name: "API Test Generator", desc: "Generate Postman collections from requirements", active: false },
   { id: "selenium", name: "Selenium Script Generator", desc: "Auto-generate Selenium automation scripts", active: false },
   { id: "playwright", name: "Playwright Script Generator", desc: "Auto-generate Playwright automation scripts", active: false },
@@ -10,6 +10,23 @@ const modules = [
   { id: "locators", name: "Self-Healing Locators", desc: "Detect and repair broken UI locators", active: false },
   { id: "report", name: "AI Report Generator", desc: "Summarized, AI-written test reports", active: false },
 ];
+
+const endpoints = {
+  requirements: {
+    url: "http://127.0.0.1:5000/api/analyze-requirements",
+    resultKey: "requirements",
+    title: "Requirement Analyzer",
+    desc: "Upload a PDF, DOCX, or TXT requirement document to extract structured requirements.",
+    buttonLabel: "Analyze Requirements",
+  },
+  testcases: {
+    url: "http://127.0.0.1:5000/api/generate-testcases",
+    resultKey: "testcases",
+    title: "Test Case Generator",
+    desc: "Upload a requirement document to generate functional, positive, negative & boundary test cases.",
+    buttonLabel: "Generate Test Cases",
+  },
+};
 
 function App() {
   const [status, setStatus] = useState("connecting");
@@ -39,14 +56,22 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  const switchModule = (id) => {
+    setActiveModule(id);
+    setFile(null);
+    setResult(null);
+    setError(null);
+  };
+
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
     setResult(null);
     setError(null);
   };
 
-  const handleAnalyze = async () => {
+  const handleSubmit = async () => {
     if (!file) return;
+    const config = endpoints[activeModule];
     setAnalyzing(true);
     setError(null);
     setResult(null);
@@ -55,7 +80,7 @@ function App() {
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/analyze-requirements", {
+      const res = await fetch(config.url, {
         method: "POST",
         body: formData,
       });
@@ -72,6 +97,8 @@ function App() {
     }
   };
 
+  const config = endpoints[activeModule];
+
   return (
     <div className="min-h-screen bg-[#0B0D12] text-[#E8EAF0] flex">
       {/* Sidebar */}
@@ -85,7 +112,7 @@ function App() {
           {modules.map((m) => (
             <div
               key={m.id}
-              onClick={() => m.active && setActiveModule(m.id)}
+              onClick={() => m.active && switchModule(m.id)}
               className={`px-3 py-2 rounded-lg text-sm transition ${
                 m.active
                   ? activeModule === m.id
@@ -129,50 +156,44 @@ function App() {
             </div>
           </div>
 
-          {activeModule === "requirements" && (
-            <>
-              <h2 className="font-display text-2xl font-bold mb-1">Requirement Analyzer</h2>
-              <p className="text-[#7C8699] text-sm mb-6">
-                Upload a PDF, DOCX, or TXT requirement document to extract structured requirements.
+          <h2 className="font-display text-2xl font-bold mb-1">{config.title}</h2>
+          <p className="text-[#7C8699] text-sm mb-6">{config.desc}</p>
+
+          <div className="border border-dashed border-[#232838] rounded-xl p-8 text-center bg-[#101319] mb-6">
+            <input
+              type="file"
+              accept=".pdf,.docx,.txt"
+              onChange={handleFileChange}
+              className="block mx-auto text-sm text-[#7C8699] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#4CC9F0]/10 file:text-[#4CC9F0] file:text-sm hover:file:bg-[#4CC9F0]/20 cursor-pointer"
+            />
+            {file && (
+              <p className="font-mono text-xs text-[#7C8699] mt-3">{file.name}</p>
+            )}
+          </div>
+
+          <button
+            onClick={handleSubmit}
+            disabled={!file || analyzing}
+            className="bg-[#4CC9F0] text-[#0B0D12] font-medium text-sm px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#4CC9F0]/90 transition"
+          >
+            {analyzing ? "Working..." : config.buttonLabel}
+          </button>
+
+          {error && (
+            <div className="mt-6 border border-red-500/30 bg-red-500/10 text-red-400 text-sm rounded-xl p-4">
+              {error}
+            </div>
+          )}
+
+          {result && (
+            <div className="mt-6 border border-[#232838] bg-[#141821] rounded-xl p-6">
+              <p className="font-mono text-xs text-[#7C8699] mb-3">
+                OUTPUT FOR {result.filename.toUpperCase()}
               </p>
-
-              <div className="border border-dashed border-[#232838] rounded-xl p-8 text-center bg-[#101319] mb-6">
-                <input
-                  type="file"
-                  accept=".pdf,.docx,.txt"
-                  onChange={handleFileChange}
-                  className="block mx-auto text-sm text-[#7C8699] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#4CC9F0]/10 file:text-[#4CC9F0] file:text-sm hover:file:bg-[#4CC9F0]/20 cursor-pointer"
-                />
-                {file && (
-                  <p className="font-mono text-xs text-[#7C8699] mt-3">{file.name}</p>
-                )}
-              </div>
-
-              <button
-                onClick={handleAnalyze}
-                disabled={!file || analyzing}
-                className="bg-[#4CC9F0] text-[#0B0D12] font-medium text-sm px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#4CC9F0]/90 transition"
-              >
-                {analyzing ? "Analyzing..." : "Analyze Requirements"}
-              </button>
-
-              {error && (
-                <div className="mt-6 border border-red-500/30 bg-red-500/10 text-red-400 text-sm rounded-xl p-4">
-                  {error}
-                </div>
-              )}
-
-              {result && (
-                <div className="mt-6 border border-[#232838] bg-[#141821] rounded-xl p-6">
-                  <p className="font-mono text-xs text-[#7C8699] mb-3">
-                    EXTRACTED FROM {result.filename.toUpperCase()}
-                  </p>
-                  <pre className="whitespace-pre-wrap font-mono text-sm text-[#E8EAF0] leading-relaxed">
-                    {result.requirements}
-                  </pre>
-                </div>
-              )}
-            </>
+              <pre className="whitespace-pre-wrap font-mono text-sm text-[#E8EAF0] leading-relaxed">
+                {result[config.resultKey]}
+              </pre>
+            </div>
           )}
         </div>
       </main>
