@@ -230,5 +230,68 @@ Requirement text:
     })
 
 
+@app.route("/api/generate-selenium", methods=["POST"])
+def generate_selenium():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(filepath)
+
+    try:
+        raw_text = extract_text(file, filepath)
+        if raw_text is None:
+            return jsonify({"error": "Unsupported file type. Use PDF, DOCX, or TXT."}), 400
+    except Exception as e:
+        return jsonify({"error": f"Failed to read file: {str(e)}"}), 500
+
+    if not raw_text.strip():
+        return jsonify({"error": "No readable text found in the file."}), 400
+
+    prompt = f"""
+You are a senior QA automation engineer. Read the following software requirement text
+and generate a complete Python Selenium test automation script.
+
+Rules:
+- Use Python with the selenium package (webdriver, By, expected_conditions, WebDriverWait).
+- Structure it as a proper test file using Python's unittest framework.
+- Use placeholder CSS selectors like (By.ID, "email") and (By.ID, "password") — reasonable guesses based on the requirement text.
+- Include setUp (open browser, navigate to a placeholder URL like "https://example.com/login") and tearDown (quit browser) methods.
+- Write one test method per requirement, with clear method names like test_successful_login.
+- Include assertions that check expected outcomes (e.g. checking page title, URL, or element text after an action).
+- Add short comments explaining each major step.
+- Return ONLY the Python code, no markdown code fences, no commentary outside the code.
+
+Requirement text:
+{raw_text[:8000]}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        script_text = response.choices[0].message.content.strip()
+
+        # Clean up in case the model wraps it in markdown fences anyway
+        if script_text.startswith("```"):
+            script_text = script_text.split("```")[1]
+            if script_text.startswith("python"):
+                script_text = script_text[6:]
+            script_text = script_text.strip()
+
+    except Exception as e:
+        return jsonify({"error": f"Groq API error: {str(e)}"}), 500
+
+    return jsonify({
+        "filename": file.filename,
+        "selenium_script": script_text
+    })
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

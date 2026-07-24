@@ -4,7 +4,7 @@ const modules = [
   { id: "requirements", name: "Requirement Analyzer", desc: "Extract structured requirements from PDF/DOCX/TXT", active: true },
   { id: "testcases", name: "Test Case Generator", desc: "Functional, boundary & negative test cases", active: true },
   { id: "api", name: "API Test Generator", desc: "Generate Postman collections from requirements", active: true },
-  { id: "selenium", name: "Selenium Script Generator", desc: "Auto-generate Selenium automation scripts", active: false },
+  { id: "selenium", name: "Selenium Script Generator", desc: "Auto-generate Selenium automation scripts", active: true },
   { id: "playwright", name: "Playwright Script Generator", desc: "Auto-generate Playwright automation scripts", active: false },
   { id: "testdata", name: "Test Data Generator", desc: "Realistic & edge-case test data", active: false },
   { id: "locators", name: "Self-Healing Locators", desc: "Detect and repair broken UI locators", active: false },
@@ -35,6 +35,18 @@ const endpoints = {
     desc: "Upload a requirement document to generate a downloadable Postman collection.",
     buttonLabel: "Generate Postman Collection",
     downloadable: true,
+    downloadName: "postman_collection.json",
+    downloadType: "application/json",
+  },
+  selenium: {
+    url: "http://127.0.0.1:5000/api/generate-selenium",
+    resultKey: "selenium_script",
+    title: "Selenium Script Generator",
+    desc: "Upload a requirement document to generate a Python Selenium automation test script.",
+    buttonLabel: "Generate Selenium Script",
+    downloadable: true,
+    downloadName: "test_selenium.py",
+    downloadType: "text/x-python",
   },
 };
 
@@ -110,11 +122,11 @@ function App() {
   const handleDownload = () => {
     if (!result) return;
     const config = endpoints[activeModule];
-    const blob = new Blob([result[config.resultKey]], { type: "application/json" });
+    const blob = new Blob([result[config.resultKey]], { type: config.downloadType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "postman_collection.json";
+    a.download = config.downloadName;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -207,7 +219,7 @@ function App() {
                 onClick={handleDownload}
                 className="border border-[#34D399]/40 text-[#34D399] font-medium text-sm px-5 py-2.5 rounded-lg hover:bg-[#34D399]/10 transition"
               >
-                Download JSON
+                Download {config.downloadName}
               </button>
             )}
           </div>
