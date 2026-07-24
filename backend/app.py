@@ -169,5 +169,66 @@ Requirement text:
     })
 
 
+@app.route("/api/generate-api-tests", methods=["POST"])
+def generate_api_tests():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(filepath)
+
+    try:
+        raw_text = extract_text(file, filepath)
+        if raw_text is None:
+            return jsonify({"error": "Unsupported file type. Use PDF, DOCX, or TXT."}), 400
+    except Exception as e:
+        return jsonify({"error": f"Failed to read file: {str(e)}"}), 500
+
+    if not raw_text.strip():
+        return jsonify({"error": "No readable text found in the file."}), 400
+
+    prompt = f"""
+You are a senior QA automation engineer. Read the following software requirement text
+and generate a Postman collection in valid Postman Collection v2.1 JSON format.
+
+Rules:
+- Infer reasonable REST API endpoints based on the requirements (e.g. login, password reset, user list).
+- Use a base URL variable: {{{{base_url}}}}
+- Include realistic HTTP methods (GET, POST, PUT, DELETE) matching each requirement's action.
+- Include a JSON request body where relevant (e.g. login with email/password).
+- Include at least one test script per request checking status code 200 or 201 using pm.test(...).
+- Return ONLY valid JSON, no markdown code fences, no commentary, no explanation text.
+
+Requirement text:
+{raw_text[:8000]}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        collection_text = response.choices[0].message.content.strip()
+
+        # Clean up in case the model wraps it in markdown fences anyway
+        if collection_text.startswith("```"):
+            collection_text = collection_text.split("```")[1]
+            if collection_text.startswith("json"):
+                collection_text = collection_text[4:]
+            collection_text = collection_text.strip()
+
+    except Exception as e:
+        return jsonify({"error": f"Groq API error: {str(e)}"}), 500
+
+    return jsonify({
+        "filename": file.filename,
+        "postman_collection": collection_text
+    })
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

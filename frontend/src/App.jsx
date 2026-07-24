@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 const modules = [
   { id: "requirements", name: "Requirement Analyzer", desc: "Extract structured requirements from PDF/DOCX/TXT", active: true },
   { id: "testcases", name: "Test Case Generator", desc: "Functional, boundary & negative test cases", active: true },
-  { id: "api", name: "API Test Generator", desc: "Generate Postman collections from requirements", active: false },
+  { id: "api", name: "API Test Generator", desc: "Generate Postman collections from requirements", active: true },
   { id: "selenium", name: "Selenium Script Generator", desc: "Auto-generate Selenium automation scripts", active: false },
   { id: "playwright", name: "Playwright Script Generator", desc: "Auto-generate Playwright automation scripts", active: false },
   { id: "testdata", name: "Test Data Generator", desc: "Realistic & edge-case test data", active: false },
@@ -18,6 +18,7 @@ const endpoints = {
     title: "Requirement Analyzer",
     desc: "Upload a PDF, DOCX, or TXT requirement document to extract structured requirements.",
     buttonLabel: "Analyze Requirements",
+    downloadable: false,
   },
   testcases: {
     url: "http://127.0.0.1:5000/api/generate-testcases",
@@ -25,6 +26,15 @@ const endpoints = {
     title: "Test Case Generator",
     desc: "Upload a requirement document to generate functional, positive, negative & boundary test cases.",
     buttonLabel: "Generate Test Cases",
+    downloadable: false,
+  },
+  api: {
+    url: "http://127.0.0.1:5000/api/generate-api-tests",
+    resultKey: "postman_collection",
+    title: "API Test Generator",
+    desc: "Upload a requirement document to generate a downloadable Postman collection.",
+    buttonLabel: "Generate Postman Collection",
+    downloadable: true,
   },
 };
 
@@ -95,6 +105,18 @@ function App() {
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  const handleDownload = () => {
+    if (!result) return;
+    const config = endpoints[activeModule];
+    const blob = new Blob([result[config.resultKey]], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "postman_collection.json";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const config = endpoints[activeModule];
@@ -171,13 +193,24 @@ function App() {
             )}
           </div>
 
-          <button
-            onClick={handleSubmit}
-            disabled={!file || analyzing}
-            className="bg-[#4CC9F0] text-[#0B0D12] font-medium text-sm px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#4CC9F0]/90 transition"
-          >
-            {analyzing ? "Working..." : config.buttonLabel}
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleSubmit}
+              disabled={!file || analyzing}
+              className="bg-[#4CC9F0] text-[#0B0D12] font-medium text-sm px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#4CC9F0]/90 transition"
+            >
+              {analyzing ? "Working..." : config.buttonLabel}
+            </button>
+
+            {config.downloadable && result && (
+              <button
+                onClick={handleDownload}
+                className="border border-[#34D399]/40 text-[#34D399] font-medium text-sm px-5 py-2.5 rounded-lg hover:bg-[#34D399]/10 transition"
+              >
+                Download JSON
+              </button>
+            )}
+          </div>
 
           {error && (
             <div className="mt-6 border border-red-500/30 bg-red-500/10 text-red-400 text-sm rounded-xl p-4">
@@ -190,7 +223,7 @@ function App() {
               <p className="font-mono text-xs text-[#7C8699] mb-3">
                 OUTPUT FOR {result.filename.toUpperCase()}
               </p>
-              <pre className="whitespace-pre-wrap font-mono text-sm text-[#E8EAF0] leading-relaxed">
+              <pre className="whitespace-pre-wrap font-mono text-xs text-[#E8EAF0] leading-relaxed max-h-96 overflow-y-auto">
                 {result[config.resultKey]}
               </pre>
             </div>
