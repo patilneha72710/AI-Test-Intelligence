@@ -1,0 +1,5 @@
+The system shall allow users to log in using their email and password.
+The system shall allow users to reset their password via email verification.
+The system shall display an error message if login credentials are incorrect.
+The system shall lock the account after 5 failed login attempts.
+The system shall allow admin users to view all registered users.
