@@ -7,7 +7,7 @@ const modules = [
   { id: "selenium", name: "Selenium Script Generator", desc: "Auto-generate Selenium automation scripts", active: true },
   { id: "playwright", name: "Playwright Script Generator", desc: "Auto-generate Playwright automation scripts", active: true },
   { id: "testdata", name: "Test Data Generator", desc: "Realistic & edge-case test data", active: true },
-  { id: "locators", name: "Self-Healing Locators", desc: "Detect and repair broken UI locators", active: false },
+  { id: "locators", name: "Self-Healing Locators", desc: "Detect and repair broken UI locators", active: true },
   { id: "report", name: "AI Report Generator", desc: "Summarized, AI-written test reports", active: false },
 ];
 
@@ -70,6 +70,22 @@ const endpoints = {
   },
 };
 
+const SAMPLE_OLD_HTML = `<form id="login-form">
+  <input id="email" type="text" name="email" />
+  <input id="password" type="password" name="password" />
+  <button id="login-button">Log In</button>
+</form>`;
+
+const SAMPLE_NEW_HTML = `<form id="login-form">
+  <input id="user-email" type="text" name="email" />
+  <input id="user-password" type="password" name="password" />
+  <button class="btn-primary" data-testid="submit-login">Log In</button>
+</form>`;
+
+const SAMPLE_LOCATORS = `#email
+#password
+#login-button`;
+
 function App() {
   const [status, setStatus] = useState("connecting");
   const [log, setLog] = useState([]);
@@ -79,6 +95,12 @@ function App() {
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+
+  // Self-healing locator state
+  const [oldHtml, setOldHtml] = useState(SAMPLE_OLD_HTML);
+  const [newHtml, setNewHtml] = useState(SAMPLE_NEW_HTML);
+  const [locators, setLocators] = useState(SAMPLE_LOCATORS);
+  const [healResult, setHealResult] = useState(null);
 
   useEffect(() => {
     const check = () => {
@@ -103,6 +125,7 @@ function App() {
     setFile(null);
     setResult(null);
     setError(null);
+    setHealResult(null);
   };
 
   const handleFileChange = (e) => {
@@ -131,6 +154,30 @@ function App() {
         setError(data.error || "Something went wrong.");
       } else {
         setResult(data);
+      }
+    } catch (err) {
+      setError("Could not reach the backend.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleHeal = async () => {
+    setAnalyzing(true);
+    setError(null);
+    setHealResult(null);
+
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/heal-locators", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ old_html: oldHtml, new_html: newHtml, locators }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Something went wrong.");
+      } else {
+        setHealResult(data.healing_result);
       }
     } catch (err) {
       setError("Could not reach the backend.");
@@ -210,55 +257,121 @@ function App() {
             </div>
           </div>
 
-          <h2 className="font-display text-2xl font-bold mb-1">{config.title}</h2>
-          <p className="text-[#7C8699] text-sm mb-6">{config.desc}</p>
-
-          <div className="border border-dashed border-[#232838] rounded-xl p-8 text-center bg-[#101319] mb-6">
-            <input
-              type="file"
-              accept=".pdf,.docx,.txt"
-              onChange={handleFileChange}
-              className="block mx-auto text-sm text-[#7C8699] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#4CC9F0]/10 file:text-[#4CC9F0] file:text-sm hover:file:bg-[#4CC9F0]/20 cursor-pointer"
-            />
-            {file && (
-              <p className="font-mono text-xs text-[#7C8699] mt-3">{file.name}</p>
-            )}
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              onClick={handleSubmit}
-              disabled={!file || analyzing}
-              className="bg-[#4CC9F0] text-[#0B0D12] font-medium text-sm px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#4CC9F0]/90 transition"
-            >
-              {analyzing ? "Working..." : config.buttonLabel}
-            </button>
-
-            {config.downloadable && result && (
-              <button
-                onClick={handleDownload}
-                className="border border-[#34D399]/40 text-[#34D399] font-medium text-sm px-5 py-2.5 rounded-lg hover:bg-[#34D399]/10 transition"
-              >
-                Download {config.downloadName}
-              </button>
-            )}
-          </div>
-
-          {error && (
-            <div className="mt-6 border border-red-500/30 bg-red-500/10 text-red-400 text-sm rounded-xl p-4">
-              {error}
-            </div>
-          )}
-
-          {result && (
-            <div className="mt-6 border border-[#232838] bg-[#141821] rounded-xl p-6">
-              <p className="font-mono text-xs text-[#7C8699] mb-3">
-                OUTPUT FOR {result.filename.toUpperCase()}
+          {activeModule === "locators" ? (
+            <>
+              <h2 className="font-display text-2xl font-bold mb-1">Self-Healing Locators</h2>
+              <p className="text-[#7C8699] text-sm mb-6">
+                Paste the old HTML, the new HTML after a page change, and the locators your
+                script uses. The AI detects which ones broke and suggests fixes.
               </p>
-              <pre className="whitespace-pre-wrap font-mono text-xs text-[#E8EAF0] leading-relaxed max-h-96 overflow-y-auto">
-                {result[config.resultKey]}
-              </pre>
-            </div>
+
+              <div className="grid md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="font-mono text-xs text-[#7C8699] mb-1 block">OLD HTML</label>
+                  <textarea
+                    value={oldHtml}
+                    onChange={(e) => setOldHtml(e.target.value)}
+                    rows={8}
+                    className="w-full bg-[#101319] border border-[#232838] rounded-lg p-3 text-xs font-mono text-[#E8EAF0] focus:outline-none focus:border-[#4CC9F0]/40"
+                  />
+                </div>
+                <div>
+                  <label className="font-mono text-xs text-[#7C8699] mb-1 block">NEW HTML</label>
+                  <textarea
+                    value={newHtml}
+                    onChange={(e) => setNewHtml(e.target.value)}
+                    rows={8}
+                    className="w-full bg-[#101319] border border-[#232838] rounded-lg p-3 text-xs font-mono text-[#E8EAF0] focus:outline-none focus:border-[#4CC9F0]/40"
+                  />
+                </div>
+              </div>
+
+              <label className="font-mono text-xs text-[#7C8699] mb-1 block">
+                LOCATORS TO CHECK (one per line)
+              </label>
+              <textarea
+                value={locators}
+                onChange={(e) => setLocators(e.target.value)}
+                rows={4}
+                className="w-full bg-[#101319] border border-[#232838] rounded-lg p-3 text-xs font-mono text-[#E8EAF0] mb-6 focus:outline-none focus:border-[#4CC9F0]/40"
+              />
+
+              <button
+                onClick={handleHeal}
+                disabled={analyzing}
+                className="bg-[#4CC9F0] text-[#0B0D12] font-medium text-sm px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#4CC9F0]/90 transition"
+              >
+                {analyzing ? "Checking..." : "Check & Heal Locators"}
+              </button>
+
+              {error && (
+                <div className="mt-6 border border-red-500/30 bg-red-500/10 text-red-400 text-sm rounded-xl p-4">
+                  {error}
+                </div>
+              )}
+
+              {healResult && (
+                <div className="mt-6 border border-[#232838] bg-[#141821] rounded-xl p-6">
+                  <p className="font-mono text-xs text-[#7C8699] mb-3">HEALING RESULT</p>
+                  <pre className="whitespace-pre-wrap font-mono text-xs text-[#E8EAF0] leading-relaxed max-h-96 overflow-y-auto">
+                    {healResult}
+                  </pre>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <h2 className="font-display text-2xl font-bold mb-1">{config.title}</h2>
+              <p className="text-[#7C8699] text-sm mb-6">{config.desc}</p>
+
+              <div className="border border-dashed border-[#232838] rounded-xl p-8 text-center bg-[#101319] mb-6">
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.txt"
+                  onChange={handleFileChange}
+                  className="block mx-auto text-sm text-[#7C8699] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#4CC9F0]/10 file:text-[#4CC9F0] file:text-sm hover:file:bg-[#4CC9F0]/20 cursor-pointer"
+                />
+                {file && (
+                  <p className="font-mono text-xs text-[#7C8699] mt-3">{file.name}</p>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSubmit}
+                  disabled={!file || analyzing}
+                  className="bg-[#4CC9F0] text-[#0B0D12] font-medium text-sm px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#4CC9F0]/90 transition"
+                >
+                  {analyzing ? "Working..." : config.buttonLabel}
+                </button>
+
+                {config.downloadable && result && (
+                  <button
+                    onClick={handleDownload}
+                    className="border border-[#34D399]/40 text-[#34D399] font-medium text-sm px-5 py-2.5 rounded-lg hover:bg-[#34D399]/10 transition"
+                  >
+                    Download {config.downloadName}
+                  </button>
+                )}
+              </div>
+
+              {error && (
+                <div className="mt-6 border border-red-500/30 bg-red-500/10 text-red-400 text-sm rounded-xl p-4">
+                  {error}
+                </div>
+              )}
+
+              {result && (
+                <div className="mt-6 border border-[#232838] bg-[#141821] rounded-xl p-6">
+                  <p className="font-mono text-xs text-[#7C8699] mb-3">
+                    OUTPUT FOR {result.filename.toUpperCase()}
+                  </p>
+                  <pre className="whitespace-pre-wrap font-mono text-xs text-[#E8EAF0] leading-relaxed max-h-96 overflow-y-auto">
+                    {result[config.resultKey]}
+                  </pre>
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>

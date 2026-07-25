@@ -421,5 +421,67 @@ Requirement text:
     })
 
 
+@app.route("/api/heal-locators", methods=["POST"])
+def heal_locators():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Request must be JSON with 'old_html', 'new_html', and 'locators'."}), 400
+
+    old_html = data.get("old_html", "").strip()
+    new_html = data.get("new_html", "").strip()
+    locators = data.get("locators", "").strip()
+
+    if not old_html or not new_html or not locators:
+        return jsonify({"error": "old_html, new_html, and locators are all required."}), 400
+
+    prompt = f"""
+You are a self-healing test automation engine. You are given:
+1. The OLD HTML a test script was originally written against.
+2. The NEW HTML after the page changed.
+3. A list of LOCATORS the test script currently uses (CSS selectors or IDs).
+
+Your job: for each locator, determine if it still exists/works in the NEW HTML.
+If it's broken, find the most likely replacement element in the NEW HTML and suggest
+a new locator for it, explaining what changed.
+
+Return the output as a JSON array of objects, one per locator, each with:
+- "old_locator": the original locator
+- "status": "unchanged" or "broken"
+- "suggested_locator": the new locator to use (same as old_locator if unchanged)
+- "explanation": short explanation of what changed and why the new locator was chosen
+
+Return ONLY valid JSON (an array), no markdown code fences, no commentary.
+
+OLD HTML:
+{old_html[:4000]}
+
+NEW HTML:
+{new_html[:4000]}
+
+LOCATORS TO CHECK:
+{locators}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        healing_text = response.choices[0].message.content.strip()
+
+        if healing_text.startswith("```"):
+            healing_text = healing_text.split("```")[1]
+            if healing_text.startswith("json"):
+                healing_text = healing_text[4:]
+            healing_text = healing_text.strip()
+
+    except Exception as e:
+        return jsonify({"error": f"Groq API error: {str(e)}"}), 500
+
+    return jsonify({
+        "healing_result": healing_text
+    })
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
