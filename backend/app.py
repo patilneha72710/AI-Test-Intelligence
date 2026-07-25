@@ -356,5 +356,70 @@ Requirement text:
     })
 
 
+@app.route("/api/generate-testdata", methods=["POST"])
+def generate_testdata():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(filepath)
+
+    try:
+        raw_text = extract_text(file, filepath)
+        if raw_text is None:
+            return jsonify({"error": "Unsupported file type. Use PDF, DOCX, or TXT."}), 400
+    except Exception as e:
+        return jsonify({"error": f"Failed to read file: {str(e)}"}), 500
+
+    if not raw_text.strip():
+        return jsonify({"error": "No readable text found in the file."}), 400
+
+    prompt = f"""
+You are a senior QA engineer. Read the following software requirement text and generate
+realistic test data for testing it.
+
+Return the output as a JSON array of objects. Each object should represent one test data
+record and include these fields:
+- "category": one of "valid", "invalid", "boundary", "edge_case"
+- "field": the input field this data is for (e.g. "email", "password")
+- "value": the actual test data value
+- "reason": a short explanation of why this value is useful to test
+
+Generate at least 3 records per relevant field, covering valid, invalid, boundary, and
+edge case values (e.g. empty strings, very long strings, special characters, min/max lengths).
+
+Return ONLY valid JSON (an array), no markdown code fences, no commentary.
+
+Requirement text:
+{raw_text[:8000]}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        testdata_text = response.choices[0].message.content.strip()
+
+        # Clean up in case the model wraps it in markdown fences anyway
+        if testdata_text.startswith("```"):
+            testdata_text = testdata_text.split("```")[1]
+            if testdata_text.startswith("json"):
+                testdata_text = testdata_text[4:]
+            testdata_text = testdata_text.strip()
+
+    except Exception as e:
+        return jsonify({"error": f"Groq API error: {str(e)}"}), 500
+
+    return jsonify({
+        "filename": file.filename,
+        "test_data": testdata_text
+    })
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

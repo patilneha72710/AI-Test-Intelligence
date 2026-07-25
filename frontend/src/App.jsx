@@ -6,7 +6,7 @@ const modules = [
   { id: "api", name: "API Test Generator", desc: "Generate Postman collections from requirements", active: true },
   { id: "selenium", name: "Selenium Script Generator", desc: "Auto-generate Selenium automation scripts", active: true },
   { id: "playwright", name: "Playwright Script Generator", desc: "Auto-generate Playwright automation scripts", active: true },
-  { id: "testdata", name: "Test Data Generator", desc: "Realistic & edge-case test data", active: false },
+  { id: "testdata", name: "Test Data Generator", desc: "Realistic & edge-case test data", active: true },
   { id: "locators", name: "Self-Healing Locators", desc: "Detect and repair broken UI locators", active: false },
   { id: "report", name: "AI Report Generator", desc: "Summarized, AI-written test reports", active: false },
 ];
@@ -57,6 +57,16 @@ const endpoints = {
     downloadable: true,
     downloadName: "test_playwright.py",
     downloadType: "text/x-python",
+  },
+  testdata: {
+    url: "http://127.0.0.1:5000/api/generate-testdata",
+    resultKey: "test_data",
+    title: "Test Data Generator",
+    desc: "Upload a requirement document to generate realistic, boundary & edge-case test data.",
+    buttonLabel: "Generate Test Data",
+    downloadable: true,
+    downloadName: "test_data.json",
+    downloadType: "application/json",
   },
 };
 
