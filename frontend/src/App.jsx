@@ -8,7 +8,7 @@ const modules = [
   { id: "playwright", name: "Playwright Script Generator", desc: "Auto-generate Playwright automation scripts", active: true },
   { id: "testdata", name: "Test Data Generator", desc: "Realistic & edge-case test data", active: true },
   { id: "locators", name: "Self-Healing Locators", desc: "Detect and repair broken UI locators", active: true },
-  { id: "report", name: "AI Report Generator", desc: "Summarized, AI-written test reports", active: false },
+  { id: "report", name: "AI Report Generator", desc: "Summarized, AI-written test reports", active: true },
 ];
 
 const endpoints = {
@@ -86,6 +86,9 @@ const SAMPLE_LOCATORS = `#email
 #password
 #login-button`;
 
+const SAMPLE_FAILURES = `test_invalid_login_credentials - AssertionError: expected error message not shown
+test_account_lock_after_five_failed_logins - TimeoutError: #account-locked-message not found`;
+
 function App() {
   const [status, setStatus] = useState("connecting");
   const [log, setLog] = useState([]);
@@ -101,6 +104,14 @@ function App() {
   const [newHtml, setNewHtml] = useState(SAMPLE_NEW_HTML);
   const [locators, setLocators] = useState(SAMPLE_LOCATORS);
   const [healResult, setHealResult] = useState(null);
+
+  // Report generator state
+  const [projectName, setProjectName] = useState("AI Test Intelligence Platform");
+  const [totalTests, setTotalTests] = useState("12");
+  const [passed, setPassed] = useState("10");
+  const [failed, setFailed] = useState("2");
+  const [failures, setFailures] = useState(SAMPLE_FAILURES);
+  const [reportResult, setReportResult] = useState(null);
 
   useEffect(() => {
     const check = () => {
@@ -126,6 +137,7 @@ function App() {
     setResult(null);
     setError(null);
     setHealResult(null);
+    setReportResult(null);
   };
 
   const handleFileChange = (e) => {
@@ -186,6 +198,36 @@ function App() {
     }
   };
 
+  const handleGenerateReport = async () => {
+    setAnalyzing(true);
+    setError(null);
+    setReportResult(null);
+
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/generate-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_name: projectName,
+          total_tests: totalTests,
+          passed,
+          failed,
+          failures,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Something went wrong.");
+      } else {
+        setReportResult(data.report);
+      }
+    } catch (err) {
+      setError("Could not reach the backend.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const handleDownload = () => {
     if (!result) return;
     const config = endpoints[activeModule];
@@ -198,7 +240,21 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadReport = () => {
+    if (!reportResult) return;
+    const blob = new Blob([reportResult], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "test_report.md";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const config = endpoints[activeModule];
+
+  const inputClass =
+    "w-full bg-[#101319] border border-[#232838] rounded-lg p-2.5 text-sm text-[#E8EAF0] focus:outline-none focus:border-[#4CC9F0]/40";
 
   return (
     <div className="min-h-screen bg-[#0B0D12] text-[#E8EAF0] flex">
@@ -257,7 +313,7 @@ function App() {
             </div>
           </div>
 
-          {activeModule === "locators" ? (
+          {activeModule === "locators" && (
             <>
               <h2 className="font-display text-2xl font-bold mb-1">Self-Healing Locators</h2>
               <p className="text-[#7C8699] text-sm mb-6">
@@ -319,7 +375,97 @@ function App() {
                 </div>
               )}
             </>
-          ) : (
+          )}
+
+          {activeModule === "report" && (
+            <>
+              <h2 className="font-display text-2xl font-bold mb-1">AI Report Generator</h2>
+              <p className="text-[#7C8699] text-sm mb-6">
+                Enter your test run results and get a clean, stakeholder-ready summary report.
+              </p>
+
+              <div className="grid md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="font-mono text-xs text-[#7C8699] mb-1 block">PROJECT NAME</label>
+                  <input
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="font-mono text-xs text-[#7C8699] mb-1 block">TOTAL TESTS</label>
+                  <input
+                    value={totalTests}
+                    onChange={(e) => setTotalTests(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="font-mono text-xs text-[#7C8699] mb-1 block">PASSED</label>
+                  <input
+                    value={passed}
+                    onChange={(e) => setPassed(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="font-mono text-xs text-[#7C8699] mb-1 block">FAILED</label>
+                  <input
+                    value={failed}
+                    onChange={(e) => setFailed(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              <label className="font-mono text-xs text-[#7C8699] mb-1 block">
+                FAILURE DETAILS (one per line)
+              </label>
+              <textarea
+                value={failures}
+                onChange={(e) => setFailures(e.target.value)}
+                rows={4}
+                className="w-full bg-[#101319] border border-[#232838] rounded-lg p-3 text-xs font-mono text-[#E8EAF0] mb-6 focus:outline-none focus:border-[#4CC9F0]/40"
+              />
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleGenerateReport}
+                  disabled={analyzing}
+                  className="bg-[#4CC9F0] text-[#0B0D12] font-medium text-sm px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#4CC9F0]/90 transition"
+                >
+                  {analyzing ? "Generating..." : "Generate Report"}
+                </button>
+
+                {reportResult && (
+                  <button
+                    onClick={handleDownloadReport}
+                    className="border border-[#34D399]/40 text-[#34D399] font-medium text-sm px-5 py-2.5 rounded-lg hover:bg-[#34D399]/10 transition"
+                  >
+                    Download test_report.md
+                  </button>
+                )}
+              </div>
+
+              {error && (
+                <div className="mt-6 border border-red-500/30 bg-red-500/10 text-red-400 text-sm rounded-xl p-4">
+                  {error}
+                </div>
+              )}
+
+              {reportResult && (
+                <div className="mt-6 border border-[#232838] bg-[#141821] rounded-xl p-6">
+                  <p className="font-mono text-xs text-[#7C8699] mb-3">GENERATED REPORT</p>
+                  <pre className="whitespace-pre-wrap font-mono text-xs text-[#E8EAF0] leading-relaxed max-h-96 overflow-y-auto">
+                    {reportResult}
+                  </pre>
+                </div>
+              )}
+            </>
+          )}
+
+          {activeModule !== "locators" && activeModule !== "report" && (
             <>
               <h2 className="font-display text-2xl font-bold mb-1">{config.title}</h2>
               <p className="text-[#7C8699] text-sm mb-6">{config.desc}</p>

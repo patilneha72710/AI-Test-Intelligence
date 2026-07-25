@@ -214,7 +214,6 @@ Requirement text:
         )
         collection_text = response.choices[0].message.content.strip()
 
-        # Clean up in case the model wraps it in markdown fences anyway
         if collection_text.startswith("```"):
             collection_text = collection_text.split("```")[1]
             if collection_text.startswith("json"):
@@ -277,7 +276,6 @@ Requirement text:
         )
         script_text = response.choices[0].message.content.strip()
 
-        # Clean up in case the model wraps it in markdown fences anyway
         if script_text.startswith("```"):
             script_text = script_text.split("```")[1]
             if script_text.startswith("python"):
@@ -340,7 +338,6 @@ Requirement text:
         )
         script_text = response.choices[0].message.content.strip()
 
-        # Clean up in case the model wraps it in markdown fences anyway
         if script_text.startswith("```"):
             script_text = script_text.split("```")[1]
             if script_text.startswith("python"):
@@ -405,7 +402,6 @@ Requirement text:
         )
         testdata_text = response.choices[0].message.content.strip()
 
-        # Clean up in case the model wraps it in markdown fences anyway
         if testdata_text.startswith("```"):
             testdata_text = testdata_text.split("```")[1]
             if testdata_text.startswith("json"):
@@ -480,6 +476,62 @@ LOCATORS TO CHECK:
 
     return jsonify({
         "healing_result": healing_text
+    })
+
+
+@app.route("/api/generate-report", methods=["POST"])
+def generate_report():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Request must be JSON with test run details."}), 400
+
+    project_name = data.get("project_name", "").strip()
+    total_tests = data.get("total_tests", "").strip()
+    passed = data.get("passed", "").strip()
+    failed = data.get("failed", "").strip()
+    failures = data.get("failures", "").strip()
+
+    if not project_name or not total_tests:
+        return jsonify({"error": "project_name and total_tests are required."}), 400
+
+    prompt = f"""
+You are a senior QA lead writing a test execution summary report for stakeholders.
+
+Test run details:
+- Project: {project_name}
+- Total tests run: {total_tests}
+- Passed: {passed}
+- Failed: {failed}
+- Failure details:
+{failures if failures else "None"}
+
+Write a clear, professional test execution report in Markdown format including:
+1. A short executive summary (2-3 sentences, pass rate and overall health)
+2. A results table (Total / Passed / Failed / Pass Rate %)
+3. A "Key Issues" section listing each failure with a one-line likely cause and suggested next step
+4. A brief "Recommendation" section (e.g. ready to release, needs fixes before release, etc.)
+
+Return ONLY the Markdown report, no commentary outside it.
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        report_text = response.choices[0].message.content.strip()
+
+        if report_text.startswith("```"):
+            report_text = report_text.split("```")[1]
+            if report_text.startswith("markdown"):
+                report_text = report_text[8:]
+            report_text = report_text.strip()
+
+    except Exception as e:
+        return jsonify({"error": f"Groq API error: {str(e)}"}), 500
+
+    return jsonify({
+        "report": report_text
     })
 
 
