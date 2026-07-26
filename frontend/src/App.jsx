@@ -393,6 +393,31 @@ function Dashboard({ username, onLogout }) {
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadReportPdf = async () => {
+    if (!reportResult) return;
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/download-report-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ report: reportResult }),
+      });
+      if (!res.ok) {
+        setError("Could not generate PDF.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "test_report.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError("Could not reach the backend.");
+    }
+  };
+
   const config = endpoints[activeModule];
 
   const inputClass =
@@ -591,12 +616,20 @@ function Dashboard({ username, onLogout }) {
                 </button>
 
                 {reportResult && (
-                  <button
-                    onClick={handleDownloadReport}
-                    className="border border-[#34D399]/40 text-[#34D399] font-medium text-sm px-5 py-2.5 rounded-lg hover:bg-[#34D399]/10 transition"
-                  >
-                    Download test_report.md
-                  </button>
+                  <>
+                    <button
+                      onClick={handleDownloadReport}
+                      className="border border-[#34D399]/40 text-[#34D399] font-medium text-sm px-5 py-2.5 rounded-lg hover:bg-[#34D399]/10 transition"
+                    >
+                      Download .md
+                    </button>
+                    <button
+                      onClick={handleDownloadReportPdf}
+                      className="border border-[#4CC9F0]/40 text-[#4CC9F0] font-medium text-sm px-5 py-2.5 rounded-lg hover:bg-[#4CC9F0]/10 transition"
+                    >
+                      Download PDF
+                    </button>
+                  </>
                 )}
               </div>
 

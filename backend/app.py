@@ -675,6 +675,57 @@ Return ONLY the Markdown report, no commentary outside it.
         "report": report_text
     })
 
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from flask import send_file
+import io
+import re
+
+
+@app.route("/api/download-report-pdf", methods=["POST"])
+@login_required
+def download_report_pdf():
+    data = request.get_json(silent=True)
+    if not data or "report" not in data:
+        return jsonify({"error": "report content is required."}), 400
+
+    report_md = data["report"]
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=50, bottomMargin=50)
+    styles = getSampleStyleSheet()
+    story = []
+
+    for line in report_md.split("\n"):
+        line = line.strip()
+        if not line:
+            story.append(Spacer(1, 8))
+            continue
+
+        if line.startswith("# "):
+            story.append(Paragraph(line[2:], styles["Title"]))
+        elif line.startswith("## "):
+            story.append(Paragraph(line[3:], styles["Heading2"]))
+        elif line.startswith("|"):
+            continue  # tables handled separately below if needed
+        else:
+            clean = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", line)
+            story.append(Paragraph(clean, styles["Normal"]))
+            story.append(Spacer(1, 4))
+
+    doc.build(story)
+    buffer.seek(0)
+
+    log_activity(session["user_id"], "download_report_pdf", "test_report.pdf")
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="test_report.pdf",
+        mimetype="application/pdf"
+    )
 
 @app.route("/api/history")
 @login_required
