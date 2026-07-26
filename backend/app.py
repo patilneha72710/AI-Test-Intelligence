@@ -1,16 +1,21 @@
 ﻿import os
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, session
 from flask_cors import CORS
 from dotenv import load_dotenv
 from groq import Groq
 from PyPDF2 import PdfReader
 import docx
+from werkzeug.security import generate_password_hash, check_password_hash
+from database import init_db, get_connection
 
 # Load environment variables from .env
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-change-this")
+CORS(app, supports_credentials=True, origins=["http://localhost:5173"])
+
+init_db()
 
 # Configure Groq
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
@@ -29,6 +34,83 @@ def home():
 def health():
     return jsonify({"status": "ok"})
 
+@app.route("/api/signup", methods=["POST"])
+def signup():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Request must be JSON."}), 400
+
+    username = data.get("username", "").strip()
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "").strip()
+
+    if not username or not email or not password:
+        return jsonify({"error": "username, email, and password are required."}), 400
+
+    if len(password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters."}), 400
+
+    password_hash = generate_password_hash(password)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+            (username, email, password_hash)
+        )
+        conn.commit()
+        user_id = cursor.lastrowid
+    except Exception:
+        conn.close()
+        return jsonify({"error": "Username or email already exists."}), 409
+
+    conn.close()
+
+    session["user_id"] = user_id
+    session["username"] = username
+
+    return jsonify({"message": "Signup successful", "username": username}), 201
+
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Request must be JSON."}), 400
+
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "").strip()
+
+    if not email or not password:
+        return jsonify({"error": "email and password are required."}), 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
+    user = cursor.fetchone()
+    conn.close()
+
+    if not user or not check_password_hash(user["password_hash"], password):
+        return jsonify({"error": "Invalid email or password."}), 401
+
+    session["user_id"] = user["id"]
+    session["username"] = user["username"]
+
+    return jsonify({"message": "Login successful", "username": user["username"]})
+
+
+@app.route("/api/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({"message": "Logged out"})
+
+
+@app.route("/api/me")
+def me():
+    if "user_id" not in session:
+        return jsonify({"logged_in": False}), 200
+    return jsonify({"logged_in": True, "username": session["username"]})
 
 def extract_text_from_pdf(filepath):
     reader = PdfReader(filepath)

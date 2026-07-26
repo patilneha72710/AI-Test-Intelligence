@@ -89,7 +89,128 @@ const SAMPLE_LOCATORS = `#email
 const SAMPLE_FAILURES = `test_invalid_login_credentials - AssertionError: expected error message not shown
 test_account_lock_after_five_failed_logins - TimeoutError: #account-locked-message not found`;
 
-function App() {
+function AuthPage({ onAuthed }) {
+  const [mode, setMode] = useState("login"); // "login" | "signup"
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const inputClass =
+    "w-full bg-[#101319] border border-[#232838] rounded-lg p-2.5 text-sm text-[#E8EAF0] focus:outline-none focus:border-[#4CC9F0]/40";
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    const url =
+      mode === "login"
+        ? "http://127.0.0.1:5000/api/login"
+        : "http://127.0.0.1:5000/api/signup";
+
+    const body =
+      mode === "login" ? { email, password } : { username, email, password };
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Something went wrong.");
+      } else {
+        onAuthed(data.username);
+      }
+    } catch (err) {
+      setError("Could not reach the backend.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0B0D12] text-[#E8EAF0] flex items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        <h1 className="font-display font-bold text-2xl tracking-tight text-center mb-1">
+          Test<span className="text-[#4CC9F0]">Intel</span>
+        </h1>
+        <p className="text-xs text-[#7C8699] text-center mb-8">AI Test Intelligence Platform</p>
+
+        <div className="bg-[#141821] border border-[#232838] rounded-xl p-6">
+          <div className="flex mb-6 border border-[#232838] rounded-lg overflow-hidden text-sm">
+            <button
+              onClick={() => { setMode("login"); setError(null); }}
+              className={`flex-1 py-2 transition ${mode === "login" ? "bg-[#4CC9F0] text-[#0B0D12] font-medium" : "text-[#7C8699]"}`}
+            >
+              Log In
+            </button>
+            <button
+              onClick={() => { setMode("signup"); setError(null); }}
+              className={`flex-1 py-2 transition ${mode === "signup" ? "bg-[#4CC9F0] text-[#0B0D12] font-medium" : "text-[#7C8699]"}`}
+            >
+              Sign Up
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-3">
+            {mode === "signup" && (
+              <div>
+                <label className="font-mono text-xs text-[#7C8699] mb-1 block">USERNAME</label>
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className={inputClass}
+                  required
+                />
+              </div>
+            )}
+            <div>
+              <label className="font-mono text-xs text-[#7C8699] mb-1 block">EMAIL</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={inputClass}
+                required
+              />
+            </div>
+            <div>
+              <label className="font-mono text-xs text-[#7C8699] mb-1 block">PASSWORD</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={inputClass}
+                required
+              />
+            </div>
+
+            {error && (
+              <div className="border border-red-500/30 bg-red-500/10 text-red-400 text-sm rounded-lg p-3">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#4CC9F0] text-[#0B0D12] font-medium text-sm px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#4CC9F0]/90 transition mt-2"
+            >
+              {loading ? "Please wait..." : mode === "login" ? "Log In" : "Create Account"}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Dashboard({ username, onLogout }) {
   const [status, setStatus] = useState("connecting");
   const [log, setLog] = useState([]);
   const [activeModule, setActiveModule] = useState("requirements");
@@ -99,13 +220,11 @@ function App() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
-  // Self-healing locator state
   const [oldHtml, setOldHtml] = useState(SAMPLE_OLD_HTML);
   const [newHtml, setNewHtml] = useState(SAMPLE_NEW_HTML);
   const [locators, setLocators] = useState(SAMPLE_LOCATORS);
   const [healResult, setHealResult] = useState(null);
 
-  // Report generator state
   const [projectName, setProjectName] = useState("AI Test Intelligence Platform");
   const [totalTests, setTotalTests] = useState("12");
   const [passed, setPassed] = useState("10");
@@ -159,6 +278,7 @@ function App() {
     try {
       const res = await fetch(config.url, {
         method: "POST",
+        credentials: "include",
         body: formData,
       });
       const data = await res.json();
@@ -183,6 +303,7 @@ function App() {
       const res = await fetch("http://127.0.0.1:5000/api/heal-locators", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ old_html: oldHtml, new_html: newHtml, locators }),
       });
       const data = await res.json();
@@ -207,6 +328,7 @@ function App() {
       const res = await fetch("http://127.0.0.1:5000/api/generate-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           project_name: projectName,
           total_tests: totalTests,
@@ -259,13 +381,13 @@ function App() {
   return (
     <div className="min-h-screen bg-[#0B0D12] text-[#E8EAF0] flex">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-[#232838] px-6 py-8 hidden md:block">
+      <aside className="w-64 border-r border-[#232838] px-6 py-8 hidden md:flex md:flex-col">
         <h1 className="font-display font-bold text-lg tracking-tight">
           Test<span className="text-[#4CC9F0]">Intel</span>
         </h1>
         <p className="text-xs text-[#7C8699] mt-1 mb-8">AI Test Intelligence Platform</p>
 
-        <nav className="space-y-1">
+        <nav className="space-y-1 flex-1">
           {modules.map((m) => (
             <div
               key={m.id}
@@ -285,6 +407,18 @@ function App() {
             </div>
           ))}
         </nav>
+
+        <div className="border-t border-[#232838] pt-4 mt-4">
+          <p className="text-xs text-[#7C8699] mb-2">
+            Signed in as <span className="text-[#E8EAF0]">{username}</span>
+          </p>
+          <button
+            onClick={onLogout}
+            className="text-xs text-red-400 hover:text-red-300 transition"
+          >
+            Log out
+          </button>
+        </div>
       </aside>
 
       {/* Main */}
@@ -523,6 +657,43 @@ function App() {
       </main>
     </div>
   );
+}
+
+function App() {
+  const [checking, setChecking] = useState(true);
+  const [username, setUsername] = useState(null);
+
+  useEffect(() => {
+    fetch("http://127.0.0.1:5000/api/me", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.logged_in) setUsername(data.username);
+        setChecking(false);
+      })
+      .catch(() => setChecking(false));
+  }, []);
+
+  const handleLogout = async () => {
+    await fetch("http://127.0.0.1:5000/api/logout", {
+      method: "POST",
+      credentials: "include",
+    });
+    setUsername(null);
+  };
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-[#0B0D12] flex items-center justify-center">
+        <p className="text-[#7C8699] font-mono text-sm">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!username) {
+    return <AuthPage onAuthed={(name) => setUsername(name)} />;
+  }
+
+  return <Dashboard username={username} onLogout={handleLogout} />;
 }
 
 export default App;
