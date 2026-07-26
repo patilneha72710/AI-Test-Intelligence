@@ -9,6 +9,7 @@ const modules = [
   { id: "testdata", name: "Test Data Generator", desc: "Realistic & edge-case test data", active: true },
   { id: "locators", name: "Self-Healing Locators", desc: "Detect and repair broken UI locators", active: true },
   { id: "report", name: "AI Report Generator", desc: "Summarized, AI-written test reports", active: true },
+  { id: "history", name: "Test History", desc: "View everything you've generated", active: true },
 ];
 
 const endpoints = {
@@ -90,7 +91,7 @@ const SAMPLE_FAILURES = `test_invalid_login_credentials - AssertionError: expect
 test_account_lock_after_five_failed_logins - TimeoutError: #account-locked-message not found`;
 
 function AuthPage({ onAuthed }) {
-  const [mode, setMode] = useState("login"); // "login" | "signup"
+  const [mode, setMode] = useState("login");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -232,6 +233,9 @@ function Dashboard({ username, onLogout }) {
   const [failures, setFailures] = useState(SAMPLE_FAILURES);
   const [reportResult, setReportResult] = useState(null);
 
+  const [historyData, setHistoryData] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   useEffect(() => {
     const check = () => {
       fetch("http://127.0.0.1:5000/health")
@@ -250,6 +254,21 @@ function Dashboard({ username, onLogout }) {
     return () => clearInterval(interval);
   }, []);
 
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/history", {
+        credentials: "include",
+      });
+      const data = await res.json();
+      setHistoryData(data);
+    } catch (err) {
+      setHistoryData(null);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   const switchModule = (id) => {
     setActiveModule(id);
     setFile(null);
@@ -257,6 +276,7 @@ function Dashboard({ username, onLogout }) {
     setError(null);
     setHealResult(null);
     setReportResult(null);
+    if (id === "history") loadHistory();
   };
 
   const handleFileChange = (e) => {
@@ -380,14 +400,13 @@ function Dashboard({ username, onLogout }) {
 
   return (
     <div className="min-h-screen bg-[#0B0D12] text-[#E8EAF0] flex">
-      {/* Sidebar */}
       <aside className="w-64 border-r border-[#232838] px-6 py-8 hidden md:flex md:flex-col">
         <h1 className="font-display font-bold text-lg tracking-tight">
           Test<span className="text-[#4CC9F0]">Intel</span>
         </h1>
         <p className="text-xs text-[#7C8699] mt-1 mb-8">AI Test Intelligence Platform</p>
 
-        <nav className="space-y-1 flex-1">
+        <nav className="space-y-1 flex-1 overflow-y-auto">
           {modules.map((m) => (
             <div
               key={m.id}
@@ -421,7 +440,6 @@ function Dashboard({ username, onLogout }) {
         </div>
       </aside>
 
-      {/* Main */}
       <main className="flex-1 px-6 md:px-12 py-8">
         <div className="max-w-3xl">
           <p className="font-mono text-xs text-[#7C8699] mb-2">SYSTEM STATUS</p>
@@ -599,7 +617,40 @@ function Dashboard({ username, onLogout }) {
             </>
           )}
 
-          {activeModule !== "locators" && activeModule !== "report" && (
+          {activeModule === "history" && (
+            <>
+              <h2 className="font-display text-2xl font-bold mb-1">Test History</h2>
+              <p className="text-[#7C8699] text-sm mb-6">
+                Everything you've generated, saved to your account.
+              </p>
+
+              {historyLoading && <p className="text-[#7C8699] font-mono text-sm">Loading...</p>}
+
+              {historyData && Object.entries(historyData).map(([table, rows]) => (
+                <div key={table} className="mb-6">
+                  <p className="font-mono text-xs text-[#4CC9F0] uppercase mb-2">
+                    {table.replace(/_/g, " ")} ({rows.length})
+                  </p>
+                  {rows.length === 0 ? (
+                    <p className="text-xs text-[#7C8699] mb-2">Nothing here yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {rows.map((row) => (
+                        <div key={row.id} className="border border-[#232838] bg-[#141821] rounded-lg p-3">
+                          <p className="text-sm">{row.filename || row.project_name}</p>
+                          <p className="text-[10px] text-[#7C8699] font-mono">{row.created_at}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </>
+          )}
+
+          {activeModule !== "locators" &&
+            activeModule !== "report" &&
+            activeModule !== "history" && (
             <>
               <h2 className="font-display text-2xl font-bold mb-1">{config.title}</h2>
               <p className="text-[#7C8699] text-sm mb-6">{config.desc}</p>

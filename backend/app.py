@@ -1,4 +1,5 @@
 ﻿import os
+from functools import wraps
 from flask import Flask, jsonify, request, session
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -6,7 +7,7 @@ from groq import Groq
 from PyPDF2 import PdfReader
 import docx
 from werkzeug.security import generate_password_hash, check_password_hash
-from database import init_db, get_connection
+from database import init_db, get_connection, log_activity
 
 # Load environment variables from .env
 load_dotenv()
@@ -33,6 +34,7 @@ def home():
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})
+
 
 @app.route("/api/signup", methods=["POST"])
 def signup():
@@ -112,6 +114,16 @@ def me():
         return jsonify({"logged_in": False}), 200
     return jsonify({"logged_in": True, "username": session["username"]})
 
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user_id" not in session:
+            return jsonify({"error": "Please log in to use this feature."}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
 def extract_text_from_pdf(filepath):
     reader = PdfReader(filepath)
     text = ""
@@ -142,7 +154,19 @@ def extract_text(file, filepath):
         return None
 
 
+def save_history(table, filename, content):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        f"INSERT INTO {table} (user_id, filename, content) VALUES (?, ?, ?)",
+        (session["user_id"], filename, content)
+    )
+    conn.commit()
+    conn.close()
+
+
 @app.route("/api/analyze-requirements", methods=["POST"])
+@login_required
 def analyze_requirements():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
@@ -185,6 +209,9 @@ Document text:
     except Exception as e:
         return jsonify({"error": f"Groq API error: {str(e)}"}), 500
 
+    save_history("uploaded_requirements", file.filename, requirements_text)
+    log_activity(session["user_id"], "analyze_requirements", file.filename)
+
     return jsonify({
         "filename": file.filename,
         "requirements": requirements_text
@@ -192,6 +219,7 @@ Document text:
 
 
 @app.route("/api/generate-testcases", methods=["POST"])
+@login_required
 def generate_testcases():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
@@ -245,6 +273,9 @@ Requirement text:
     except Exception as e:
         return jsonify({"error": f"Groq API error: {str(e)}"}), 500
 
+    save_history("generated_testcases", file.filename, testcases_text)
+    log_activity(session["user_id"], "generate_testcases", file.filename)
+
     return jsonify({
         "filename": file.filename,
         "testcases": testcases_text
@@ -252,6 +283,7 @@ Requirement text:
 
 
 @app.route("/api/generate-api-tests", methods=["POST"])
+@login_required
 def generate_api_tests():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
@@ -305,13 +337,15 @@ Requirement text:
     except Exception as e:
         return jsonify({"error": f"Groq API error: {str(e)}"}), 500
 
+    log_activity(session["user_id"], "generate_api_tests", file.filename)
+
     return jsonify({
         "filename": file.filename,
         "postman_collection": collection_text
     })
 
-
 @app.route("/api/generate-selenium", methods=["POST"])
+@login_required
 def generate_selenium():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
@@ -367,6 +401,9 @@ Requirement text:
     except Exception as e:
         return jsonify({"error": f"Groq API error: {str(e)}"}), 500
 
+    save_history("selenium_scripts", file.filename, script_text)
+    log_activity(session["user_id"], "generate_selenium", file.filename)
+
     return jsonify({
         "filename": file.filename,
         "selenium_script": script_text
@@ -374,6 +411,7 @@ Requirement text:
 
 
 @app.route("/api/generate-playwright", methods=["POST"])
+@login_required
 def generate_playwright():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
@@ -429,6 +467,9 @@ Requirement text:
     except Exception as e:
         return jsonify({"error": f"Groq API error: {str(e)}"}), 500
 
+    save_history("playwright_scripts", file.filename, script_text)
+    log_activity(session["user_id"], "generate_playwright", file.filename)
+
     return jsonify({
         "filename": file.filename,
         "playwright_script": script_text
@@ -436,6 +477,7 @@ Requirement text:
 
 
 @app.route("/api/generate-testdata", methods=["POST"])
+@login_required
 def generate_testdata():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
@@ -493,6 +535,9 @@ Requirement text:
     except Exception as e:
         return jsonify({"error": f"Groq API error: {str(e)}"}), 500
 
+    save_history("test_data", file.filename, testdata_text)
+    log_activity(session["user_id"], "generate_testdata", file.filename)
+
     return jsonify({
         "filename": file.filename,
         "test_data": testdata_text
@@ -500,6 +545,7 @@ Requirement text:
 
 
 @app.route("/api/heal-locators", methods=["POST"])
+@login_required
 def heal_locators():
     data = request.get_json(silent=True)
     if not data:
@@ -556,12 +602,15 @@ LOCATORS TO CHECK:
     except Exception as e:
         return jsonify({"error": f"Groq API error: {str(e)}"}), 500
 
+    log_activity(session["user_id"], "heal_locators", "locator check")
+
     return jsonify({
         "healing_result": healing_text
     })
 
 
 @app.route("/api/generate-report", methods=["POST"])
+@login_required
 def generate_report():
     data = request.get_json(silent=True)
     if not data:
@@ -612,9 +661,38 @@ Return ONLY the Markdown report, no commentary outside it.
     except Exception as e:
         return jsonify({"error": f"Groq API error: {str(e)}"}), 500
 
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO reports (user_id, project_name, content) VALUES (?, ?, ?)",
+        (session["user_id"], project_name, report_text)
+    )
+    conn.commit()
+    conn.close()
+    log_activity(session["user_id"], "generate_report", project_name)
+
     return jsonify({
         "report": report_text
     })
+
+
+@app.route("/api/history")
+@login_required
+def get_history():
+    conn = get_connection()
+    cursor = conn.cursor()
+    user_id = session["user_id"]
+
+    history = {}
+    for table in ["uploaded_requirements", "generated_testcases", "selenium_scripts",
+                  "playwright_scripts", "test_data", "reports"]:
+        cursor.execute(
+            f"SELECT * FROM {table} WHERE user_id = ? ORDER BY created_at DESC", (user_id,)
+        )
+        history[table] = [dict(row) for row in cursor.fetchall()]
+
+    conn.close()
+    return jsonify(history)
 
 
 if __name__ == "__main__":
