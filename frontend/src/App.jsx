@@ -240,6 +240,26 @@ function Dashboard({ username, onLogout }) {
   const [selectedProject, setSelectedProject] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
 
+  const [theme, setTheme] = useState("dark");
+  const isDark = theme === "dark";
+
+  const t = {
+    pageBg: isDark ? "bg-[#0B0D12]" : "bg-[#F4F6F8]",
+    pageText: isDark ? "text-[#E8EAF0]" : "text-[#1A1D23]",
+    sidebarBg: isDark ? "" : "bg-white",
+    sidebarBorder: isDark ? "border-[#232838]" : "border-[#E2E5EA]",
+    panelBg: isDark ? "bg-[#141821]" : "bg-white",
+    panelBorder: isDark ? "border-[#232838]" : "border-[#E2E5EA]",
+    inputBg: isDark ? "bg-[#101319]" : "bg-[#F7F8FA]",
+    inputBorder: isDark ? "border-[#232838]" : "border-[#DDE1E7]",
+    inputText: isDark ? "text-[#E8EAF0]" : "text-[#1A1D23]",
+    mutedText: isDark ? "text-[#7C8699]" : "text-[#6B7280]",
+    dashedBg: isDark ? "bg-[#101319]" : "bg-[#F7F8FA]",
+    dashedBorder: isDark ? "border-[#232838]" : "border-[#DDE1E7]",
+    navHover: isDark ? "hover:bg-[#141821]" : "hover:bg-[#F0F2F5]",
+    navActive: isDark ? "bg-[#141821]" : "bg-[#EEF2F6]",
+  };
+
   useEffect(() => {
     const check = () => {
       fetch("http://127.0.0.1:5000/health")
@@ -461,23 +481,23 @@ function Dashboard({ username, onLogout }) {
 
   const config = endpoints[activeModule];
 
-  const inputClass =
-    "w-full bg-[#101319] border border-[#232838] rounded-lg p-2.5 text-sm text-[#E8EAF0] focus:outline-none focus:border-[#4CC9F0]/40";
+  const inputClass = `w-full ${t.inputBg} border ${t.inputBorder} rounded-lg p-2.5 text-sm ${t.inputText} focus:outline-none focus:border-[#4CC9F0]/40`;
+  const textareaClass = `w-full ${t.inputBg} border ${t.inputBorder} rounded-lg p-3 text-xs font-mono ${t.inputText} focus:outline-none focus:border-[#4CC9F0]/40`;
 
   return (
-    <div className="min-h-screen bg-[#0B0D12] text-[#E8EAF0] flex">
-      <aside className="w-64 border-r border-[#232838] px-6 py-8 hidden md:flex md:flex-col">
+    <div className={`min-h-screen flex ${t.pageBg} ${t.pageText}`}>
+      <aside className={`w-64 border-r px-6 py-8 hidden md:flex md:flex-col ${t.sidebarBorder} ${t.sidebarBg}`}>
         <h1 className="font-display font-bold text-lg tracking-tight">
           Test<span className="text-[#4CC9F0]">Intel</span>
         </h1>
-        <p className="text-xs text-[#7C8699] mt-1 mb-6">AI Test Intelligence Platform</p>
+        <p className={`text-xs ${t.mutedText} mt-1 mb-6`}>AI Test Intelligence Platform</p>
 
         <div className="mb-6">
-          <label className="font-mono text-[10px] text-[#7C8699] uppercase block mb-1">Project</label>
+          <label className={`font-mono text-[10px] ${t.mutedText} uppercase block mb-1`}>Project</label>
           <select
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
-            className="w-full bg-[#101319] border border-[#232838] rounded-lg p-2 text-xs text-[#E8EAF0] mb-2"
+            className={`w-full ${t.inputBg} border ${t.inputBorder} rounded-lg p-2 text-xs ${t.inputText} mb-2`}
           >
             <option value="">No project</option>
             {projects.map((p) => (
@@ -489,7 +509,7 @@ function Dashboard({ username, onLogout }) {
               value={newProjectName}
               onChange={(e) => setNewProjectName(e.target.value)}
               placeholder="New project..."
-              className="flex-1 bg-[#101319] border border-[#232838] rounded-lg p-2 text-xs text-[#E8EAF0]"
+              className={`flex-1 ${t.inputBg} border ${t.inputBorder} rounded-lg p-2 text-xs ${t.inputText}`}
             />
             <button
               onClick={handleCreateProject}
@@ -508,9 +528,9 @@ function Dashboard({ username, onLogout }) {
               className={`px-3 py-2 rounded-lg text-sm transition ${
                 m.active
                   ? activeModule === m.id
-                    ? "bg-[#141821] text-[#E8EAF0] border border-[#4CC9F0]/40 cursor-pointer"
-                    : "text-[#E8EAF0] hover:bg-[#141821] cursor-pointer border border-transparent"
-                  : "text-[#7C8699] cursor-not-allowed"
+                    ? `${t.navActive} border border-[#4CC9F0]/40 cursor-pointer`
+                    : `${t.navHover} cursor-pointer border border-transparent`
+                  : `${t.mutedText} cursor-not-allowed`
               }`}
             >
               {m.name}
@@ -521,9 +541,15 @@ function Dashboard({ username, onLogout }) {
           ))}
         </nav>
 
-        <div className="border-t border-[#232838] pt-4 mt-4">
-          <p className="text-xs text-[#7C8699] mb-2">
-            Signed in as <span className="text-[#E8EAF0]">{username}</span>
+        <div className={`border-t ${t.sidebarBorder} pt-4 mt-4`}>
+          <button
+            onClick={() => setTheme(isDark ? "light" : "dark")}
+            className={`w-full text-xs ${t.mutedText} hover:opacity-80 transition mb-3 text-left`}
+          >
+            {isDark ? "☀ Switch to light mode" : "🌙 Switch to dark mode"}
+          </button>
+          <p className={`text-xs ${t.mutedText} mb-2`}>
+            Signed in as <span className={t.pageText}>{username}</span>
           </p>
           <button
             onClick={onLogout}
@@ -536,21 +562,21 @@ function Dashboard({ username, onLogout }) {
 
       <main className="flex-1 px-6 md:px-12 py-8">
         <div className="max-w-3xl">
-          <p className="font-mono text-xs text-[#7C8699] mb-2">SYSTEM STATUS</p>
+          <p className={`font-mono text-xs ${t.mutedText} mb-2`}>SYSTEM STATUS</p>
 
-          <div className="bg-[#141821] border border-[#232838] rounded-xl p-4 mb-10">
+          <div className={`${t.panelBg} border ${t.panelBorder} rounded-xl p-4 mb-10`}>
             <div className="flex items-center gap-2 mb-3">
               <span
                 className={`w-2 h-2 rounded-full ${
                   status === "ok" ? "bg-[#34D399]" : status === "down" ? "bg-red-500" : "bg-[#4CC9F0] animate-pulse"
                 }`}
               />
-              <span className="font-mono text-xs text-[#7C8699]">
+              <span className={`font-mono text-xs ${t.mutedText}`}>
                 backend {status === "ok" ? "connected" : status === "down" ? "unreachable" : "checking..."}
               </span>
             </div>
             <div className="font-mono text-xs space-y-1">
-              {log.length === 0 && <p className="text-[#7C8699]">awaiting first check...</p>}
+              {log.length === 0 && <p className={t.mutedText}>awaiting first check...</p>}
               {log.map((line, i) => (
                 <p key={i} className={line.includes("200") ? "text-[#34D399]" : "text-red-400"}>
                   {line}
@@ -562,40 +588,40 @@ function Dashboard({ username, onLogout }) {
           {activeModule === "locators" && (
             <>
               <h2 className="font-display text-2xl font-bold mb-1">Self-Healing Locators</h2>
-              <p className="text-[#7C8699] text-sm mb-6">
+              <p className={`${t.mutedText} text-sm mb-6`}>
                 Paste the old HTML, the new HTML after a page change, and the locators your
                 script uses. The AI detects which ones broke and suggests fixes.
               </p>
 
               <div className="grid md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="font-mono text-xs text-[#7C8699] mb-1 block">OLD HTML</label>
+                  <label className={`font-mono text-xs ${t.mutedText} mb-1 block`}>OLD HTML</label>
                   <textarea
                     value={oldHtml}
                     onChange={(e) => setOldHtml(e.target.value)}
                     rows={8}
-                    className="w-full bg-[#101319] border border-[#232838] rounded-lg p-3 text-xs font-mono text-[#E8EAF0] focus:outline-none focus:border-[#4CC9F0]/40"
+                    className={textareaClass}
                   />
                 </div>
                 <div>
-                  <label className="font-mono text-xs text-[#7C8699] mb-1 block">NEW HTML</label>
+                  <label className={`font-mono text-xs ${t.mutedText} mb-1 block`}>NEW HTML</label>
                   <textarea
                     value={newHtml}
                     onChange={(e) => setNewHtml(e.target.value)}
                     rows={8}
-                    className="w-full bg-[#101319] border border-[#232838] rounded-lg p-3 text-xs font-mono text-[#E8EAF0] focus:outline-none focus:border-[#4CC9F0]/40"
+                    className={textareaClass}
                   />
                 </div>
               </div>
 
-              <label className="font-mono text-xs text-[#7C8699] mb-1 block">
+              <label className={`font-mono text-xs ${t.mutedText} mb-1 block`}>
                 LOCATORS TO CHECK (one per line)
               </label>
               <textarea
                 value={locators}
                 onChange={(e) => setLocators(e.target.value)}
                 rows={4}
-                className="w-full bg-[#101319] border border-[#232838] rounded-lg p-3 text-xs font-mono text-[#E8EAF0] mb-6 focus:outline-none focus:border-[#4CC9F0]/40"
+                className={`${textareaClass} mb-6`}
               />
 
               <button
@@ -613,9 +639,9 @@ function Dashboard({ username, onLogout }) {
               )}
 
               {healResult && (
-                <div className="mt-6 border border-[#232838] bg-[#141821] rounded-xl p-6">
-                  <p className="font-mono text-xs text-[#7C8699] mb-3">HEALING RESULT</p>
-                  <pre className="whitespace-pre-wrap font-mono text-xs text-[#E8EAF0] leading-relaxed max-h-96 overflow-y-auto">
+                <div className={`mt-6 border ${t.panelBorder} ${t.panelBg} rounded-xl p-6`}>
+                  <p className={`font-mono text-xs ${t.mutedText} mb-3`}>HEALING RESULT</p>
+                  <pre className={`whitespace-pre-wrap font-mono text-xs ${t.pageText} leading-relaxed max-h-96 overflow-y-auto`}>
                     {healResult}
                   </pre>
                 </div>
@@ -626,13 +652,13 @@ function Dashboard({ username, onLogout }) {
           {activeModule === "report" && (
             <>
               <h2 className="font-display text-2xl font-bold mb-1">AI Report Generator</h2>
-              <p className="text-[#7C8699] text-sm mb-6">
+              <p className={`${t.mutedText} text-sm mb-6`}>
                 Enter your test run results and get a clean, stakeholder-ready summary report.
               </p>
 
               <div className="grid md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="font-mono text-xs text-[#7C8699] mb-1 block">PROJECT NAME</label>
+                  <label className={`font-mono text-xs ${t.mutedText} mb-1 block`}>PROJECT NAME</label>
                   <input
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value)}
@@ -640,7 +666,7 @@ function Dashboard({ username, onLogout }) {
                   />
                 </div>
                 <div>
-                  <label className="font-mono text-xs text-[#7C8699] mb-1 block">TOTAL TESTS</label>
+                  <label className={`font-mono text-xs ${t.mutedText} mb-1 block`}>TOTAL TESTS</label>
                   <input
                     value={totalTests}
                     onChange={(e) => setTotalTests(e.target.value)}
@@ -648,7 +674,7 @@ function Dashboard({ username, onLogout }) {
                   />
                 </div>
                 <div>
-                  <label className="font-mono text-xs text-[#7C8699] mb-1 block">PASSED</label>
+                  <label className={`font-mono text-xs ${t.mutedText} mb-1 block`}>PASSED</label>
                   <input
                     value={passed}
                     onChange={(e) => setPassed(e.target.value)}
@@ -656,7 +682,7 @@ function Dashboard({ username, onLogout }) {
                   />
                 </div>
                 <div>
-                  <label className="font-mono text-xs text-[#7C8699] mb-1 block">FAILED</label>
+                  <label className={`font-mono text-xs ${t.mutedText} mb-1 block`}>FAILED</label>
                   <input
                     value={failed}
                     onChange={(e) => setFailed(e.target.value)}
@@ -665,14 +691,14 @@ function Dashboard({ username, onLogout }) {
                 </div>
               </div>
 
-              <label className="font-mono text-xs text-[#7C8699] mb-1 block">
+              <label className={`font-mono text-xs ${t.mutedText} mb-1 block`}>
                 FAILURE DETAILS (one per line)
               </label>
               <textarea
                 value={failures}
                 onChange={(e) => setFailures(e.target.value)}
                 rows={4}
-                className="w-full bg-[#101319] border border-[#232838] rounded-lg p-3 text-xs font-mono text-[#E8EAF0] mb-6 focus:outline-none focus:border-[#4CC9F0]/40"
+                className={`${textareaClass} mb-6`}
               />
 
               <div className="flex gap-3">
@@ -709,9 +735,9 @@ function Dashboard({ username, onLogout }) {
               )}
 
               {reportResult && (
-                <div className="mt-6 border border-[#232838] bg-[#141821] rounded-xl p-6">
-                  <p className="font-mono text-xs text-[#7C8699] mb-3">GENERATED REPORT</p>
-                  <pre className="whitespace-pre-wrap font-mono text-xs text-[#E8EAF0] leading-relaxed max-h-96 overflow-y-auto">
+                <div className={`mt-6 border ${t.panelBorder} ${t.panelBg} rounded-xl p-6`}>
+                  <p className={`font-mono text-xs ${t.mutedText} mb-3`}>GENERATED REPORT</p>
+                  <pre className={`whitespace-pre-wrap font-mono text-xs ${t.pageText} leading-relaxed max-h-96 overflow-y-auto`}>
                     {reportResult}
                   </pre>
                 </div>
@@ -722,11 +748,11 @@ function Dashboard({ username, onLogout }) {
           {activeModule === "history" && (
             <>
               <h2 className="font-display text-2xl font-bold mb-1">Test History</h2>
-              <p className="text-[#7C8699] text-sm mb-6">
+              <p className={`${t.mutedText} text-sm mb-6`}>
                 Everything you've generated, saved to your account.
               </p>
 
-              {historyLoading && <p className="text-[#7C8699] font-mono text-sm">Loading...</p>}
+              {historyLoading && <p className={`${t.mutedText} font-mono text-sm`}>Loading...</p>}
 
               {historyData && Object.entries(historyData).map(([table, rows]) => (
                 <div key={table} className="mb-6">
@@ -734,13 +760,13 @@ function Dashboard({ username, onLogout }) {
                     {table.replace(/_/g, " ")} ({rows.length})
                   </p>
                   {rows.length === 0 ? (
-                    <p className="text-xs text-[#7C8699] mb-2">Nothing here yet.</p>
+                    <p className={`text-xs ${t.mutedText} mb-2`}>Nothing here yet.</p>
                   ) : (
                     <div className="space-y-2">
                       {rows.map((row) => (
-                        <div key={row.id} className="border border-[#232838] bg-[#141821] rounded-lg p-3">
+                        <div key={row.id} className={`border ${t.panelBorder} ${t.panelBg} rounded-lg p-3`}>
                           <p className="text-sm">{row.filename || row.project_name}</p>
-                          <p className="text-[10px] text-[#7C8699] font-mono">{row.created_at}</p>
+                          <p className={`text-[10px] ${t.mutedText} font-mono`}>{row.created_at}</p>
                         </div>
                       ))}
                     </div>
@@ -755,17 +781,17 @@ function Dashboard({ username, onLogout }) {
             activeModule !== "history" && (
             <>
               <h2 className="font-display text-2xl font-bold mb-1">{config.title}</h2>
-              <p className="text-[#7C8699] text-sm mb-6">{config.desc}</p>
+              <p className={`${t.mutedText} text-sm mb-6`}>{config.desc}</p>
 
-              <div className="border border-dashed border-[#232838] rounded-xl p-8 text-center bg-[#101319] mb-6">
+              <div className={`border border-dashed ${t.dashedBorder} rounded-xl p-8 text-center ${t.dashedBg} mb-6`}>
                 <input
                   type="file"
                   accept=".pdf,.docx,.txt"
                   onChange={handleFileChange}
-                  className="block mx-auto text-sm text-[#7C8699] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#4CC9F0]/10 file:text-[#4CC9F0] file:text-sm hover:file:bg-[#4CC9F0]/20 cursor-pointer"
+                  className={`block mx-auto text-sm ${t.mutedText} file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#4CC9F0]/10 file:text-[#4CC9F0] file:text-sm hover:file:bg-[#4CC9F0]/20 cursor-pointer`}
                 />
                 {file && (
-                  <p className="font-mono text-xs text-[#7C8699] mt-3">{file.name}</p>
+                  <p className={`font-mono text-xs ${t.mutedText} mt-3`}>{file.name}</p>
                 )}
               </div>
 
@@ -795,11 +821,11 @@ function Dashboard({ username, onLogout }) {
               )}
 
               {result && (
-                <div className="mt-6 border border-[#232838] bg-[#141821] rounded-xl p-6">
-                  <p className="font-mono text-xs text-[#7C8699] mb-3">
+                <div className={`mt-6 border ${t.panelBorder} ${t.panelBg} rounded-xl p-6`}>
+                  <p className={`font-mono text-xs ${t.mutedText} mb-3`}>
                     OUTPUT FOR {result.filename.toUpperCase()}
                   </p>
-                  <pre className="whitespace-pre-wrap font-mono text-xs text-[#E8EAF0] leading-relaxed max-h-96 overflow-y-auto">
+                  <pre className={`whitespace-pre-wrap font-mono text-xs ${t.pageText} leading-relaxed max-h-96 overflow-y-auto`}>
                     {result[config.resultKey]}
                   </pre>
                 </div>
