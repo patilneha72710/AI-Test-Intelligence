@@ -236,6 +236,10 @@ function Dashboard({ username, onLogout }) {
   const [historyData, setHistoryData] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  const [projects, setProjects] = useState([]);
+  const [selectedProject, setSelectedProject] = useState("");
+  const [newProjectName, setNewProjectName] = useState("");
+
   useEffect(() => {
     const check = () => {
       fetch("http://127.0.0.1:5000/health")
@@ -253,6 +257,42 @@ function Dashboard({ username, onLogout }) {
     const interval = setInterval(check, 8000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const loadProjects = async () => {
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/projects", {
+        credentials: "include",
+      });
+      const data = await res.json();
+      setProjects(data.projects || []);
+    } catch (err) {
+      setProjects([]);
+    }
+  };
+
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim()) return;
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: newProjectName.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setNewProjectName("");
+        await loadProjects();
+        setSelectedProject(String(data.id));
+      }
+    } catch (err) {
+      // ignore
+    }
+  };
 
   const loadHistory = async () => {
     setHistoryLoading(true);
@@ -294,6 +334,7 @@ function Dashboard({ username, onLogout }) {
 
     const formData = new FormData();
     formData.append("file", file);
+    if (selectedProject) formData.append("project_id", selectedProject);
 
     try {
       const res = await fetch(config.url, {
@@ -429,7 +470,35 @@ function Dashboard({ username, onLogout }) {
         <h1 className="font-display font-bold text-lg tracking-tight">
           Test<span className="text-[#4CC9F0]">Intel</span>
         </h1>
-        <p className="text-xs text-[#7C8699] mt-1 mb-8">AI Test Intelligence Platform</p>
+        <p className="text-xs text-[#7C8699] mt-1 mb-6">AI Test Intelligence Platform</p>
+
+        <div className="mb-6">
+          <label className="font-mono text-[10px] text-[#7C8699] uppercase block mb-1">Project</label>
+          <select
+            value={selectedProject}
+            onChange={(e) => setSelectedProject(e.target.value)}
+            className="w-full bg-[#101319] border border-[#232838] rounded-lg p-2 text-xs text-[#E8EAF0] mb-2"
+          >
+            <option value="">No project</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          <div className="flex gap-1">
+            <input
+              value={newProjectName}
+              onChange={(e) => setNewProjectName(e.target.value)}
+              placeholder="New project..."
+              className="flex-1 bg-[#101319] border border-[#232838] rounded-lg p-2 text-xs text-[#E8EAF0]"
+            />
+            <button
+              onClick={handleCreateProject}
+              className="bg-[#4CC9F0]/10 text-[#4CC9F0] text-xs px-2 rounded-lg hover:bg-[#4CC9F0]/20"
+            >
+              +
+            </button>
+          </div>
+        </div>
 
         <nav className="space-y-1 flex-1 overflow-y-auto">
           {modules.map((m) => (

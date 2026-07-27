@@ -153,13 +153,13 @@ def extract_text(file, filepath):
     else:
         return None
 
-
 def save_history(table, filename, content):
+    project_id = request.form.get("project_id") or None
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        f"INSERT INTO {table} (user_id, filename, content) VALUES (?, ?, ?)",
-        (session["user_id"], filename, content)
+        f"INSERT INTO {table} (user_id, filename, content, project_id) VALUES (?, ?, ?, ?)",
+        (session["user_id"], filename, content, project_id)
     )
     conn.commit()
     conn.close()
@@ -745,6 +745,42 @@ def get_history():
     conn.close()
     return jsonify(history)
 
+@app.route("/api/projects", methods=["GET"])
+@login_required
+def list_projects():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM projects WHERE user_id = ? ORDER BY created_at DESC",
+        (session["user_id"],)
+    )
+    projects = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return jsonify({"projects": projects})
+
+
+@app.route("/api/projects", methods=["POST"])
+@login_required
+def create_project():
+    data = request.get_json(silent=True)
+    if not data or not data.get("name", "").strip():
+        return jsonify({"error": "Project name is required."}), 400
+
+    name = data["name"].strip()
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO projects (user_id, name) VALUES (?, ?)",
+        (session["user_id"], name)
+    )
+    conn.commit()
+    project_id = cursor.lastrowid
+    conn.close()
+
+    log_activity(session["user_id"], "create_project", name)
+
+    return jsonify({"id": project_id, "name": name}), 201
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
