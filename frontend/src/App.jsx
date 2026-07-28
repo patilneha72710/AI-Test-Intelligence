@@ -10,6 +10,7 @@ const modules = [
   { id: "locators", name: "Self-Healing Locators", desc: "Detect and repair broken UI locators", active: true },
   { id: "report", name: "AI Report Generator", desc: "Summarized, AI-written test reports", active: true },
   { id: "history", name: "Test History", desc: "View everything you've generated", active: true },
+  { id: "profile", name: "User Profile", desc: "View your account details", active: true },
 ];
 
 const endpoints = {
@@ -240,6 +241,9 @@ function Dashboard({ username, onLogout }) {
   const [selectedProject, setSelectedProject] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
 
+  const [profileData, setProfileData] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+
   const [theme, setTheme] = useState("dark");
   const isDark = theme === "dark";
 
@@ -329,6 +333,21 @@ function Dashboard({ username, onLogout }) {
     }
   };
 
+  const loadProfile = async () => {
+    setProfileLoading(true);
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/profile", {
+        credentials: "include",
+      });
+      const data = await res.json();
+      setProfileData(data);
+    } catch (err) {
+      setProfileData(null);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   const switchModule = (id) => {
     setActiveModule(id);
     setFile(null);
@@ -337,6 +356,7 @@ function Dashboard({ username, onLogout }) {
     setHealResult(null);
     setReportResult(null);
     if (id === "history") loadHistory();
+    if (id === "profile") loadProfile();
   };
 
   const handleFileChange = (e) => {
@@ -776,9 +796,36 @@ function Dashboard({ username, onLogout }) {
             </>
           )}
 
+          {activeModule === "profile" && (
+            <>
+              <h2 className="font-display text-2xl font-bold mb-1">User Profile</h2>
+              <p className={`${t.mutedText} text-sm mb-6`}>Your account details.</p>
+
+              {profileLoading && <p className={`${t.mutedText} font-mono text-sm`}>Loading...</p>}
+
+              {profileData && (
+                <div className={`border ${t.panelBorder} ${t.panelBg} rounded-xl p-6 max-w-md`}>
+                  <div className="mb-4">
+                    <p className={`font-mono text-[10px] ${t.mutedText} uppercase mb-1`}>Username</p>
+                    <p className="text-sm">{profileData.username}</p>
+                  </div>
+                  <div className="mb-4">
+                    <p className={`font-mono text-[10px] ${t.mutedText} uppercase mb-1`}>Email</p>
+                    <p className="text-sm">{profileData.email}</p>
+                  </div>
+                  <div>
+                    <p className={`font-mono text-[10px] ${t.mutedText} uppercase mb-1`}>Member Since</p>
+                    <p className="text-sm">{profileData.created_at}</p>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
           {activeModule !== "locators" &&
             activeModule !== "report" &&
-            activeModule !== "history" && (
+            activeModule !== "history" &&
+            activeModule !== "profile" && (
             <>
               <h2 className="font-display text-2xl font-bold mb-1">{config.title}</h2>
               <p className={`${t.mutedText} text-sm mb-6`}>{config.desc}</p>

@@ -1,6 +1,6 @@
 ﻿import os
 from functools import wraps
-from flask import Flask, jsonify, request, session
+from flask import Flask, jsonify, request, session, send_file
 from flask_cors import CORS
 from dotenv import load_dotenv
 from groq import Groq
@@ -8,6 +8,11 @@ from PyPDF2 import PdfReader
 import docx
 from werkzeug.security import generate_password_hash, check_password_hash
 from database import init_db, get_connection, log_activity
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+import io
+import re
 
 # Load environment variables from .env
 load_dotenv()
@@ -124,6 +129,17 @@ def login_required(f):
     return decorated
 
 
+@app.route("/api/profile")
+@login_required
+def get_profile():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, email, created_at FROM users WHERE id = ?", (session["user_id"],))
+    user = cursor.fetchone()
+    conn.close()
+    return jsonify(dict(user))
+
+
 def extract_text_from_pdf(filepath):
     reader = PdfReader(filepath)
     text = ""
@@ -152,6 +168,7 @@ def extract_text(file, filepath):
         return extract_text_from_txt(filepath)
     else:
         return None
+
 
 def save_history(table, filename, content):
     project_id = request.form.get("project_id") or None
@@ -343,6 +360,7 @@ Requirement text:
         "filename": file.filename,
         "postman_collection": collection_text
     })
+
 
 @app.route("/api/generate-selenium", methods=["POST"])
 @login_required
@@ -675,14 +693,6 @@ Return ONLY the Markdown report, no commentary outside it.
         "report": report_text
     })
 
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
-from flask import send_file
-import io
-import re
-
 
 @app.route("/api/download-report-pdf", methods=["POST"])
 @login_required
@@ -709,7 +719,7 @@ def download_report_pdf():
         elif line.startswith("## "):
             story.append(Paragraph(line[3:], styles["Heading2"]))
         elif line.startswith("|"):
-            continue  # tables handled separately below if needed
+            continue
         else:
             clean = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", line)
             story.append(Paragraph(clean, styles["Normal"]))
@@ -726,6 +736,7 @@ def download_report_pdf():
         download_name="test_report.pdf",
         mimetype="application/pdf"
     )
+
 
 @app.route("/api/history")
 @login_required
@@ -744,6 +755,7 @@ def get_history():
 
     conn.close()
     return jsonify(history)
+
 
 @app.route("/api/projects", methods=["GET"])
 @login_required
@@ -781,6 +793,7 @@ def create_project():
     log_activity(session["user_id"], "create_project", name)
 
     return jsonify({"id": project_id, "name": name}), 201
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
