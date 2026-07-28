@@ -794,6 +794,18 @@ def create_project():
 
     return jsonify({"id": project_id, "name": name}), 201
 
+@app.route("/api/activity-logs")
+@login_required
+def get_activity_logs():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM activity_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 50",
+        (session["user_id"],)
+    )
+    logs = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return jsonify({"logs": logs})
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

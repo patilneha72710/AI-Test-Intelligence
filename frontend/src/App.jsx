@@ -11,6 +11,7 @@ const modules = [
   { id: "report", name: "AI Report Generator", desc: "Summarized, AI-written test reports", active: true },
   { id: "history", name: "Test History", desc: "View everything you've generated", active: true },
   { id: "profile", name: "User Profile", desc: "View your account details", active: true },
+  { id: "activity", name: "Activity Logs", desc: "Recent actions on your account", active: true },
 ];
 
 const endpoints = {
@@ -244,6 +245,9 @@ function Dashboard({ username, onLogout }) {
   const [profileData, setProfileData] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
 
+  const [activityLogs, setActivityLogs] = useState(null);
+  const [activityLoading, setActivityLoading] = useState(false);
+
   const [theme, setTheme] = useState("dark");
   const isDark = theme === "dark";
 
@@ -348,6 +352,21 @@ function Dashboard({ username, onLogout }) {
     }
   };
 
+  const loadActivityLogs = async () => {
+    setActivityLoading(true);
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/activity-logs", {
+        credentials: "include",
+      });
+      const data = await res.json();
+      setActivityLogs(data.logs || []);
+    } catch (err) {
+      setActivityLogs(null);
+    } finally {
+      setActivityLoading(false);
+    }
+  };
+
   const switchModule = (id) => {
     setActiveModule(id);
     setFile(null);
@@ -355,8 +374,9 @@ function Dashboard({ username, onLogout }) {
     setError(null);
     setHealResult(null);
     setReportResult(null);
-    if (id === "history") loadHistory();
+   if (id === "history") loadHistory();
     if (id === "profile") loadProfile();
+    if (id === "activity") loadActivityLogs();
   };
 
   const handleFileChange = (e) => {
@@ -822,10 +842,40 @@ function Dashboard({ username, onLogout }) {
             </>
           )}
 
-          {activeModule !== "locators" &&
+          {activeModule === "activity" && (
+            <>
+              <h2 className="font-display text-2xl font-bold mb-1">Activity Logs</h2>
+              <p className={`${t.mutedText} text-sm mb-6`}>Your last 50 actions on this account.</p>
+
+              {activityLoading && <p className={`${t.mutedText} font-mono text-sm`}>Loading...</p>}
+
+              {activityLogs && activityLogs.length === 0 && (
+                <p className={`text-sm ${t.mutedText}`}>No activity yet.</p>
+              )}
+
+              {activityLogs && activityLogs.length > 0 && (
+                <div className="space-y-2">
+                  {activityLogs.map((log) => (
+                    <div key={log.id} className={`border ${t.panelBorder} ${t.panelBg} rounded-lg p-3 flex justify-between items-center`}>
+                      <div>
+                        <p className="text-sm font-medium">{log.action.replace(/_/g, " ")}</p>
+                        {log.details && (
+                          <p className={`text-xs ${t.mutedText} mt-0.5`}>{log.details}</p>
+                        )}
+                      </div>
+                      <p className={`text-[10px] font-mono ${t.mutedText} whitespace-nowrap ml-4`}>{log.created_at}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+         {activeModule !== "locators" &&
             activeModule !== "report" &&
             activeModule !== "history" &&
-            activeModule !== "profile" && (
+            activeModule !== "profile" &&
+            activeModule !== "activity" && (
             <>
               <h2 className="font-display text-2xl font-bold mb-1">{config.title}</h2>
               <p className={`${t.mutedText} text-sm mb-6`}>{config.desc}</p>
