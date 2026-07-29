@@ -12,6 +12,7 @@ const modules = [
   { id: "history", name: "Test History", desc: "View everything you've generated", active: true },
   { id: "profile", name: "User Profile", desc: "View your account details", active: true },
   { id: "activity", name: "Activity Logs", desc: "Recent actions on your account", active: true },
+  { id: "search", name: "Search Test Cases", desc: "Search and filter your generated test cases", active: true },
 ];
 
 const endpoints = {
@@ -248,6 +249,11 @@ function Dashboard({ username, onLogout }) {
   const [activityLogs, setActivityLogs] = useState(null);
   const [activityLoading, setActivityLoading] = useState(false);
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchCategory, setSearchCategory] = useState("");
+  const [searchResults, setSearchResults] = useState(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+
   const [theme, setTheme] = useState("dark");
   const isDark = theme === "dark";
 
@@ -367,6 +373,25 @@ function Dashboard({ username, onLogout }) {
     }
   };
 
+  const handleSearch = async () => {
+    setSearchLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) params.append("q", searchQuery);
+      if (searchCategory) params.append("category", searchCategory);
+
+      const res = await fetch(`http://127.0.0.1:5000/api/search-testcases?${params.toString()}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      setSearchResults(data.results || []);
+    } catch (err) {
+      setSearchResults(null);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
   const switchModule = (id) => {
     setActiveModule(id);
     setFile(null);
@@ -374,9 +399,10 @@ function Dashboard({ username, onLogout }) {
     setError(null);
     setHealResult(null);
     setReportResult(null);
-   if (id === "history") loadHistory();
+    if (id === "history") loadHistory();
     if (id === "profile") loadProfile();
     if (id === "activity") loadActivityLogs();
+    if (id === "search") handleSearch();
   };
 
   const handleFileChange = (e) => {
@@ -871,11 +897,75 @@ function Dashboard({ username, onLogout }) {
             </>
           )}
 
-         {activeModule !== "locators" &&
+          {activeModule === "search" && (
+            <>
+              <h2 className="font-display text-2xl font-bold mb-1">Search Test Cases</h2>
+              <p className={`${t.mutedText} text-sm mb-6`}>
+                Search across all your generated test cases by keyword or category.
+              </p>
+
+              <div className="grid md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className={`font-mono text-xs ${t.mutedText} mb-1 block`}>KEYWORD</label>
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="e.g. login, password reset..."
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className={`font-mono text-xs ${t.mutedText} mb-1 block`}>CATEGORY</label>
+                  <select
+                    value={searchCategory}
+                    onChange={(e) => setSearchCategory(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">All categories</option>
+                    <option value="functional">Functional</option>
+                    <option value="positive">Positive</option>
+                    <option value="negative">Negative</option>
+                    <option value="boundary">Boundary</option>
+                  </select>
+                </div>
+              </div>
+
+              <button
+                onClick={handleSearch}
+                disabled={searchLoading}
+                className="bg-[#4CC9F0] text-[#0B0D12] font-medium text-sm px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#4CC9F0]/90 transition mb-6"
+              >
+                {searchLoading ? "Searching..." : "Search"}
+              </button>
+
+              {searchResults && searchResults.length === 0 && (
+                <p className={`text-sm ${t.mutedText}`}>No matching test cases found.</p>
+              )}
+
+              {searchResults && searchResults.length > 0 && (
+                <div className="space-y-3">
+                  {searchResults.map((row) => (
+                    <div key={row.id} className={`border ${t.panelBorder} ${t.panelBg} rounded-xl p-4`}>
+                      <div className="flex justify-between items-center mb-2">
+                        <p className="text-sm font-medium">{row.filename}</p>
+                        <p className={`text-[10px] font-mono ${t.mutedText}`}>{row.created_at}</p>
+                      </div>
+                      <pre className={`whitespace-pre-wrap font-mono text-xs ${t.pageText} leading-relaxed max-h-48 overflow-y-auto`}>
+                        {row.content}
+                      </pre>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {activeModule !== "locators" &&
             activeModule !== "report" &&
             activeModule !== "history" &&
             activeModule !== "profile" &&
-            activeModule !== "activity" && (
+            activeModule !== "activity" &&
+            activeModule !== "search" && (
             <>
               <h2 className="font-display text-2xl font-bold mb-1">{config.title}</h2>
               <p className={`${t.mutedText} text-sm mb-6`}>{config.desc}</p>
