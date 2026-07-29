@@ -8,20 +8,20 @@ Built as a full-stack application: **React (Vite + Tailwind)** frontend, **Flask
 
 ## 📸 Screenshots
 
-> Add screenshots here after taking them from your running app. Suggested shots:
-> - Login / Signup screen
-> - Dashboard with a module open (e.g. Requirement Analyzer with results)
-> - Test Case Generator output
-> - Test History page
-> - Light mode vs dark mode side-by-side
+### Login
+![Login screen](docs/screenshots/login.png)
 
-```
-docs/screenshots/login.png
-docs/screenshots/dashboard.png
-docs/screenshots/testcases.png
-docs/screenshots/history.png
-docs/screenshots/theme-toggle.png
-```
+### Dashboard
+![Dashboard](docs/screenshots/dashboard.png)
+
+### Test Case Generator
+![Test Case Generator](docs/screenshots/testcases.png)
+
+### Test History
+![Test History](docs/screenshots/history.png)
+
+### Dark / Light Mode
+![Theme toggle](docs/screenshots/theme-toggle.png)
 
 ---
 
